@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, List, Map as MapIcon, SearchX } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { ListingCard } from "@/components/listing/listing-card";
 import { ListingsMap } from "@/components/map/listings-map-lazy";
@@ -23,11 +23,8 @@ const GRID_COLUMNS: Record<MapSize, string> = {
   2: "lg:grid-cols-[minmax(360px,1fr)_minmax(0,64vw)]",
 };
 
-const CARD_COLUMNS: Record<MapSize, string> = {
-  0: "sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4",
-  1: "sm:grid-cols-2",
-  2: "sm:grid-cols-2 lg:grid-cols-1",
-};
+/** Mobil/Tablet feste Spalten, ab Desktop so viele Spalten (mind. 340 px breit), wie in die Listenspalte passen */
+const CARD_COLUMNS = "sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(340px,1fr))]";
 
 /**
  * Orchestriert Suchleiste, Trefferliste und Karte.
@@ -42,37 +39,44 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
   // Seite und damit die Karte unter dem Mauszeiger verschieben, sodass der nächste Klick daneben geht.
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  const listRef = useRef<HTMLElement>(null);
+
   const changePage = (page: number) => {
     update({ page });
-    document.getElementById("ergebnisse")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Desktop: Liste scrollt in ihrer eigenen Spalte · Mobil: ganze Seite
+    if (window.matchMedia("(min-width: 1024px)").matches) listRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    else document.getElementById("ergebnisse")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const header = <ResultsHeader total={result.total} view={view} onViewChange={setView} />;
 
   return (
-    <>
-      <div className="mx-auto w-full max-w-[1600px] px-4 pt-3 sm:px-6 lg:px-8 lg:pt-4">
+    // Desktop: App-Layout in Bildschirmhöhe (abzüglich Seitenheader h-16), damit die Karte immer
+    // vollständig sichtbar ist und die Liste in ihrer eigenen Spalte scrollt
+    <div className="flex flex-1 flex-col lg:h-[calc(100dvh-4rem)] lg:flex-none">
+      <div className="mx-auto w-full max-w-[1600px] shrink-0 px-4 pt-3 sm:px-6 lg:px-8 lg:pt-4">
         <SearchBar total={result.total} />
       </div>
 
       <div
         id="ergebnisse"
         className={cn(
-          "grid flex-1 scroll-mt-2 gap-x-6 gap-y-4 pt-4",
-          view === "liste" && GRID_COLUMNS[mapSize],
+          "grid flex-1 scroll-mt-2 gap-x-6 gap-y-4 pt-4 lg:min-h-0",
+          view === "liste" ? cn(GRID_COLUMNS[mapSize], "lg:grid-rows-[minmax(0,1fr)]") : "lg:grid-rows-[auto_minmax(0,1fr)]",
         )}
       >
         {view === "karte" && <div className="hidden px-4 sm:px-6 lg:block lg:px-8">{header}</div>}
 
         <section
+          ref={listRef}
           aria-label="Suchergebnisse"
           className={cn(
-            "min-w-0 px-4 pb-24 sm:px-6 lg:pb-12 lg:pl-8",
-            mapSize === 0 ? "lg:pr-8" : "lg:pr-0",
+            "min-w-0 px-4 pb-24 sm:px-6 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:pb-6 lg:pl-8",
+            mapSize === 0 ? "lg:pr-8" : "lg:pr-2",
             view === "karte" && "hidden lg:hidden",
           )}
         >
-          <div className={cn("space-y-5", mapSize === 0 ? "mx-auto max-w-[1600px]" : "ml-auto max-w-[1000px]")}>
+          <div className="space-y-5">
             {header}
 
             {result.items.length === 0 ? (
@@ -81,7 +85,7 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
               <div
                 className={cn(
                   "grid gap-5 transition-opacity",
-                  CARD_COLUMNS[mapSize],
+                  CARD_COLUMNS,
                   isPending && "pointer-events-none opacity-60",
                 )}
               >
@@ -105,17 +109,15 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
           className={cn(
             "relative",
             view === "liste"
-              ? cn("hidden", mapSize > 0 && "lg:block")
-              : "block px-4 pb-24 sm:px-6 lg:px-8 lg:pb-8",
+              ? cn("hidden lg:h-full", mapSize > 0 && "lg:block")
+              : "block px-4 pb-24 sm:px-6 lg:min-h-0 lg:px-8 lg:pb-6",
           )}
         >
           {view === "karte" && <div className="mb-4 lg:hidden">{header}</div>}
           <div
             className={cn(
               "relative overflow-hidden",
-              view === "liste"
-                ? "sticky top-0 h-dvh"
-                : "h-[70dvh] rounded-xl border shadow-sm lg:h-[calc(100dvh-7rem)]",
+              view === "liste" ? "h-full" : "h-[70dvh] rounded-xl border shadow-sm lg:h-full",
             )}
           >
             <ListingsMap
@@ -161,7 +163,7 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
           {view === "liste" ? "Karte" : "Liste"}
         </Button>
       </div>
-    </>
+    </div>
   );
 }
 
