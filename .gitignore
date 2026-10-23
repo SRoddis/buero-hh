@@ -43,3 +43,6 @@ next-env.d.ts
 
 # MapLibre-Worker (wird per Script aus node_modules kopiert)
 /public/vendor/
+
+# Gescrapte Daten (Objekte, PDFs) – nicht ins Repo
+/data/
