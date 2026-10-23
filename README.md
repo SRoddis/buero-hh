@@ -18,18 +18,20 @@ Ohne weitere Konfiguration läuft die App mit **44 realistischen Mock-Objekten**
 | `npm run dev` / `build` / `start` | Entwicklung / Produktion |
 | `npm run lint`, `npm run typecheck` | Qualitätsprüfungen |
 | `npm run db:seed:generate` | erzeugt `supabase/seed.sql` aus den Mock-Daten |
+| `npm run db:push` | neue Migrationen ins verknüpfte Supabase-Projekt einspielen |
+| `npm run db:types` | TypeScript-Typen aus dem Datenbankschema generieren |
 
 ## Funktionen
 
 - **Suche** nach Stadtteil (Mehrfachauswahl, gruppiert nach Bezirk), Objektart, Lage, Mietfläche und Miete (€/m²)
 - **Schnellfilter** (Nutzungsart, provisionsfrei, Neubau, barrierefrei …) und **„Weitere Filter“** mit 20 Ausstattungsmerkmalen
 - **Karte** mit Clustering, Farbcodierung nach Objektart, Popup-Karte und Legende
-- **Synchronisierung Liste ↔ Karte:** Hover auf einer Karte hebt den Marker hervor (auch innerhalb von Clustern), Klick auf einen Marker hebt die Karte in der Liste hervor und scrollt hin; optional **„Beim Verschieben der Karte suchen“** (PostGIS-Bounding-Box)
+- **Synchronisierung Liste ↔ Karte:** Hover auf einer Karte zeigt den Marker als Preis-Pin (auch innerhalb von Clustern), Klick auf einen Marker öffnet die Objektvorschau und hebt die Karte in der Liste hervor; optional **„Beim Verschieben der Karte suchen“** (PostGIS-Bounding-Box)
 - **Alle Suchparameter in der URL** (`/immobilien?stadtteil=hafencity&typ=buero&flaeche_von=200&ausstattung=provisionsfrei`) – teilbar, lesezeichenfähig, „Suche speichern“ kopiert den Link
 - **Sortierung** und **Paginierung**, optimistische UI-Updates während der Server neu lädt
 - **Detailseite** mit Bildergalerie + Lightbox (Tastatur), Eckdaten, Mietflächen-Tabelle, Objektdaten, Lagekarte, ähnlichen Objekten und **Kontaktformular** (Server Action, Zod-Validierung, Honeypot)
 - **Merkliste** ohne Login (lokal im Browser)
-- **Responsive:** auf Mobilgeräten Filter im Sheet und Umschalter Liste/Karte
+- **Responsive:** Desktop als App-Layout in Bildschirmhöhe (Liste scrollt, Karte fix, Größe umschaltbar); mobil Such-Fly-up und Umschalter Liste/Karte
 
 ## Projektstruktur
 
@@ -61,17 +63,24 @@ Seiten greifen ausschließlich über `PropertyRepository` (`src/lib/data/reposit
 
 ## Supabase anbinden
 
-1. Projekt anlegen (oder lokal mit `supabase init && supabase start`).
-2. Migration und Seed einspielen:
+Das Projekt ist mit Supabase Cloud verknüpft (`supabase/config.toml`, CLI als Dev-Abhängigkeit). Für ein neues Projekt bzw. einen neuen Rechner:
+
+1. Einmalig anmelden und verknüpfen (interaktiv, fragt nach dem Datenbank-Passwort):
    ```bash
-   supabase db push                 # oder supabase db reset (lokal, spielt auch seed.sql ein)
+   npx supabase login
+   npx supabase link --project-ref <projekt-ref>
    ```
-3. `.env.local` anlegen (Vorlage: `.env.example`):
+2. Schema und Testdaten einspielen:
+   ```bash
+   npx supabase db push --linked --include-seed   # später nur: npm run db:push
+   ```
+3. `.env.local` anlegen (Vorlage: `.env.example`; Key unter „Project Settings → API Keys“):
    ```
    DATA_SOURCE=supabase
    SUPABASE_URL=https://<projekt>.supabase.co
-   SUPABASE_ANON_KEY=<anon key>
+   SUPABASE_PUBLISHABLE_KEY=<publishable key>
    ```
+4. Nach Schemaänderungen: neue Datei unter `supabase/migrations/`, dann `npm run db:push` und `npm run db:types`.
 
 ### Datenmodell
 

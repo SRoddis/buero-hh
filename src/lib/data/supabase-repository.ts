@@ -16,6 +16,8 @@ import type {
   SearchResult,
 } from "@/lib/types";
 
+import type { Database } from "@/lib/supabase/database.types";
+
 import type { PropertyRepository } from "./repository";
 
 /** Zeile der View `property_listings` (siehe supabase/migrations). */
@@ -147,18 +149,22 @@ function toMarker(row: Pick<ListingRow, "id" | "slug" | "title" | "category" | "
   };
 }
 
-function searchArgs(f: SearchFilters) {
+type SearchArgs = Database["public"]["Functions"]["search_properties"]["Args"];
+
+/** Nicht gesetzte Filter werden weggelassen – die SQL-Funktion nutzt dann ihren Standardwert (null). */
+function searchArgs(f: SearchFilters): SearchArgs {
+  const orUndefined = <T>(value: T | null) => value ?? undefined;
   return {
-    p_districts: f.districts.length ? f.districts : null,
-    p_category: f.category,
-    p_types: f.types.length ? f.types : null,
-    p_location_class: f.locationClass,
-    p_area_min: f.areaMin,
-    p_area_max: f.areaMax,
-    p_rent_min: f.rentMin,
-    p_rent_max: f.rentMax,
-    p_features: f.features.length ? f.features : null,
-    p_bbox: f.bbox,
+    p_districts: f.districts.length ? f.districts : undefined,
+    p_category: orUndefined(f.category),
+    p_types: f.types.length ? f.types : undefined,
+    p_location_class: orUndefined(f.locationClass),
+    p_area_min: orUndefined(f.areaMin),
+    p_area_max: orUndefined(f.areaMax),
+    p_rent_min: orUndefined(f.rentMin),
+    p_rent_max: orUndefined(f.rentMax),
+    p_features: f.features.length ? f.features : undefined,
+    p_bbox: orUndefined(f.bbox),
   };
 }
 
@@ -201,7 +207,8 @@ export class SupabasePropertyRepository implements PropertyRepository {
       .eq("status", "published")
       .maybeSingle();
     if (error) throw error;
-    return data ? toListing(data as ListingRow) : null;
+    // JSON-Spalten (units, images, building, contact) sind in den generierten Typen nur als Json typisiert
+    return data ? toListing(data as unknown as ListingRow) : null;
   }
 
   async getByIds(ids: string[]) {

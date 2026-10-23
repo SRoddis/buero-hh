@@ -23,7 +23,7 @@ export interface PropertyRepository {
 }
 
 export function isSupabaseConfigured() {
-  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
+  return Boolean(process.env.SUPABASE_URL && (process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY));
 }
 
 let repository: Promise<PropertyRepository> | undefined;
