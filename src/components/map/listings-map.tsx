@@ -18,14 +18,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { HAMBURG_CENTER } from "@/lib/constants";
+import { CATEGORY_COLORS, HAMBURG_CENTER, type PropertyCategory } from "@/lib/constants";
 import type { MapMarker, SearchFilters } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-import { MapLegend } from "./map-legend";
+import { MapGroupCard } from "./map-group-card";
 import { MapPopupCard } from "./map-popup-card";
 import { PricePin } from "./price-pin";
-import { BRAND, CATEGORY_COLOR_EXPRESSION, MAP_STYLE_URL, toFeatureCollection, WORKER_URL } from "./map-style";
+import { BRAND, CATEGORY_COLOR_EXPRESSION, displayCategory, MAP_STYLE_URL, toFeatureCollection, WORKER_URL } from "./map-style";
 
 setWorkerUrl(WORKER_URL);
 
@@ -43,6 +43,8 @@ export interface ListingsMapProps {
   onBboxChange: (bbox: SearchFilters["bbox"]) => void;
   /** Ändert sich, wenn sich die Filter ändern – dann wird auf die Treffer gezoomt */
   fitKey: string;
+  /** Aktiver Objektart-Filter – bestimmt die Punktfarbe gemischter Objekte */
+  colorCategory?: PropertyCategory | null;
   className?: string;
 }
 
@@ -63,6 +65,12 @@ const POPUP_OFFSET: Offset = {
 const COMPACT_MAX_WIDTH = 520;
 /** Punkt um diesen Wert (px) über die Kartenmitte schieben, damit er oberhalb der Overlay-Karte liegt */
 const COMPACT_CARD_SHIFT = 130;
+/** Wie COMPACT_CARD_SHIFT, für die höhere Gruppenkarte */
+const COMPACT_GROUP_SHIFT = 225;
+/** Verschiebung (px) beim Öffnen einer Gruppenliste auf dem Desktop */
+const GROUP_LIST_SHIFT = 150;
+/** Halbe Kantenlänge (Grad, ≈ 20 m) des Ausschnitts für „Alle Angebote anzeigen“ */
+const GROUP_BBOX_DEGREES = 0.0002;
 
 /** Trefferfläche um einen Punkt (px) – deckt auch den darüberliegenden Preis-Pin ab */
 const HIT_PADDING: [number, number] = [26, 12];
@@ -73,7 +81,7 @@ function boundsToBbox(map: MapLibreMap): Bbox {
 }
 
 export default function ListingsMap(props: ListingsMapProps) {
-  const { markers, hoveredId, selectedId, bbox, fitKey, className } = props;
+  const { markers, hoveredId, selectedId, bbox, fitKey, colorCategory = null, className } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const popupRef = useRef<Popup | null>(null);
@@ -82,6 +90,10 @@ export default function ListingsMap(props: ListingsMapProps) {
   const [ready, setReady] = useState(false);
   /** Schmale Karte: Objektkarte als feste Overlay-Karte statt Popup, damit sie nie abgeschnitten wird */
   const [compact, setCompact] = useState(false);
+  /** Mehrere Angebote am selben Ort (aus einem nicht weiter teilbaren Cluster) */
+  const [group, setGroup] = useState<{ ids: string[]; lng: number; lat: number } | null>(null);
+  /** Aktuell angezeigtes Angebot in der Gruppenkarte */
+  const [groupActiveId, setGroupActiveId] = useState<string | null>(null);
   const popupNode = useMemo(() => document.createElement("div"), []);
   const pinNode = useMemo(() => {
     const el = document.createElement("div");
@@ -97,7 +109,21 @@ export default function ListingsMap(props: ListingsMapProps) {
 
   const markersById = useMemo(() => new Map(markers.map((m) => [m.id, m])), [markers]);
   const selectedMarker = selectedId ? markersById.get(selectedId) : undefined;
-  const activeMarker = markersById.get(hoveredId ?? selectedId ?? "");
+  const activeMarker = markersById.get(hoveredId ?? selectedId ?? (group ? groupActiveId : null) ?? "");
+  const groupMarkers = useMemo(
+    () => (group ? group.ids.map((id) => markersById.get(id)).filter((m): m is MapMarker => Boolean(m)) : []),
+    [group, markersById],
+  );
+  const showGroup = !selectedMarker && groupMarkers.length > 1;
+
+  const closeGroup = () => setGroup(null);
+  /** „Alle anzeigen“: Trefferliste per eng gefasstem Kartenausschnitt auf diesen Ort beschränken */
+  const showGroupInList = () => {
+    if (!group) return;
+    const d = GROUP_BBOX_DEGREES;
+    props.onBboxChange([group.lng - d, group.lat - d, group.lng + d, group.lat + d]);
+    setGroup(null);
+  };
 
   // Karte einmalig initialisieren
   useEffect(() => {
@@ -122,10 +148,12 @@ export default function ListingsMap(props: ListingsMapProps) {
     map.on("load", () => {
       map.addSource("listings", {
         type: "geojson",
-        data: toFeatureCollection(latest.current.markers),
+        data: toFeatureCollection(latest.current.markers, latest.current.colorCategory),
         cluster: true,
         clusterRadius: 46,
-        clusterMaxZoom: 14,
+        // Bis zur maximalen Zoomstufe clustern: Angebote mit identischer Adresse liegen sonst
+        // unsichtbar übereinander – so bleiben sie als Kreis mit Anzahl erkennbar
+        clusterMaxZoom: 18,
       });
 
       map.addLayer({
@@ -183,19 +211,31 @@ export default function ListingsMap(props: ListingsMapProps) {
 
       map.on("click", async (e) => {
         const point = pointAt(e.point);
-        if (point) return latest.current.onSelect(point.properties.id as string);
+        if (point) {
+          setGroup(null);
+          return latest.current.onSelect(point.properties.id as string);
+        }
 
         const cluster = clusterAt(e.point);
         if (cluster) {
-          const zoom = await map.getSource<GeoJSONSource>("listings")?.getClusterExpansionZoom(cluster.properties.cluster_id);
-          map.easeTo({
-            center: (cluster.geometry as GeoJSON.Point).coordinates as [number, number],
-            zoom: zoom ?? map.getZoom() + 2,
-          });
+          const source = map.getSource<GeoJSONSource>("listings");
+          const clusterId = cluster.properties.cluster_id as number;
+          const [lng, lat] = (cluster.geometry as GeoJSON.Point).coordinates as [number, number];
+          const zoom = await source?.getClusterExpansionZoom(clusterId);
+          // Lässt sich der Cluster nicht weiter aufteilen (gleiche Adresse), die Angebote als Liste zeigen
+          if (source && zoom != null && zoom > map.getMaxZoom()) {
+            const leaves = await source.getClusterLeaves(clusterId, 500, 0);
+            latest.current.onSelect(null);
+            setGroup({ ids: leaves.map((f) => f.properties?.id as string), lng, lat });
+            return;
+          }
+          setGroup(null);
+          map.easeTo({ center: [lng, lat], zoom: zoom ?? map.getZoom() + 2 });
           return;
         }
 
         // Klick auf freie Kartenfläche schließt das Popup
+        setGroup(null);
         latest.current.onSelect(null);
       });
 
@@ -238,7 +278,10 @@ export default function ListingsMap(props: ListingsMapProps) {
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
-    map.getSource<GeoJSONSource>("listings")?.setData(toFeatureCollection(markers));
+    map.getSource<GeoJSONSource>("listings")?.setData(toFeatureCollection(markers, colorCategory));
+    // Cluster in der Farbe der gefilterten Objektart, sonst in der Markenfarbe
+    map.setPaintProperty("clusters", "circle-color", colorCategory ? CATEGORY_COLORS[colorCategory] : BRAND);
+    setGroup(null);
 
     if (lastFitKey.current === fitKey) return;
     const initial = lastFitKey.current === null;
@@ -253,7 +296,7 @@ export default function ListingsMap(props: ListingsMapProps) {
       );
       map.fitBounds(bounds, { padding: 64, maxZoom: 14.5, duration: initial ? 0 : 700 });
     }
-  }, [ready, markers, fitKey, bbox]);
+  }, [ready, markers, fitKey, bbox, colorCategory]);
 
   // Preis-Pin für das Objekt, das in der Liste oder Karte aktiv ist
   useEffect(() => {
@@ -274,11 +317,12 @@ export default function ListingsMap(props: ListingsMapProps) {
     if (!ready || !map) return;
     popupRef.current?.remove();
     popupRef.current = null;
-    if (!selectedMarker) return;
+    const target = selectedMarker ?? (showGroup && group ? { lng: group.lng, lat: group.lat } : null);
+    if (!target) return;
 
     if (compact) {
-      // Schmale Karte (Mobil): Objektkarte liegt fest unten mittig – den Punkt darüber zentrieren
-      map.easeTo({ center: [selectedMarker.lng, selectedMarker.lat], offset: [0, -COMPACT_CARD_SHIFT] });
+      // Schmale Karte (Mobil): Karte liegt fest unten mittig – den Punkt darüber zentrieren
+      map.easeTo({ center: [target.lng, target.lat], offset: [0, -(selectedMarker ? COMPACT_CARD_SHIFT : COMPACT_GROUP_SHIFT)] });
       return;
     }
 
@@ -292,15 +336,18 @@ export default function ListingsMap(props: ListingsMapProps) {
       focusAfterOpen: false,
       className: "bh-listing-popup",
     })
-      .setLngLat([selectedMarker.lng, selectedMarker.lat])
+      .setLngLat([target.lng, target.lat])
       .setDOMContent(popupNode)
       .addTo(map);
     popupRef.current = popup;
 
-    if (!map.getBounds().contains([selectedMarker.lng, selectedMarker.lat])) {
-      map.easeTo({ center: [selectedMarker.lng, selectedMarker.lat] });
+    if (!selectedMarker) {
+      // Gruppenliste ist hoch: Ort in den oberen Kartenbereich schieben, damit die Liste darunter Platz hat
+      map.easeTo({ center: [target.lng, target.lat], offset: [0, -GROUP_LIST_SHIFT] });
+    } else if (!map.getBounds().contains([target.lng, target.lat])) {
+      map.easeTo({ center: [target.lng, target.lat] });
     }
-  }, [ready, selectedMarker, popupNode, compact]);
+  }, [ready, selectedMarker, showGroup, group, popupNode, compact]);
 
   return (
     <div className={cn("relative size-full overflow-hidden bg-[#eef0f1]", className)}>
@@ -312,7 +359,8 @@ export default function ListingsMap(props: ListingsMapProps) {
         </div>
       )}
 
-      <label className="absolute top-3 left-3 flex cursor-pointer items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium shadow-md select-none">
+      {/* Nur Desktop: mobil ist die Karte zu klein, um den Ausschnitt sinnvoll zu verschieben */}
+      <label className="absolute top-3 left-3 hidden cursor-pointer items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium shadow-md select-none lg:flex">
         <Checkbox
           checked={bbox !== null}
           onCheckedChange={(checked) => {
@@ -323,21 +371,51 @@ export default function ListingsMap(props: ListingsMapProps) {
         Beim Verschieben der Karte suchen
       </label>
 
-      {!(compact && selectedMarker) && <MapLegend className="absolute bottom-3 left-3" />}
-
       {selectedMarker &&
         (compact ? (
           // Mobil am Bildschirm ausrichten (die Karte ragt dort unten über den Viewport), über dem Liste/Karte-Umschalter
           <div className="pointer-events-none fixed inset-x-0 bottom-[84px] z-40 flex justify-center px-4 lg:absolute lg:bottom-16 lg:z-10 lg:px-3">
             <div className="pointer-events-auto w-full max-w-[340px] overflow-hidden rounded-2xl shadow-[0_10px_30px_-8px_rgb(0_0_0/0.45)]">
-              <MapPopupCard marker={selectedMarker} className="w-full" imageClassName="aspect-[2/1]" />
+              <MapPopupCard marker={selectedMarker} onClose={() => props.onSelect(null)} compact className="w-full" />
             </div>
           </div>
         ) : (
-          createPortal(<MapPopupCard marker={selectedMarker} />, popupNode)
+          createPortal(<MapPopupCard marker={selectedMarker} onClose={() => props.onSelect(null)} />, popupNode)
+        ))}
+      {showGroup &&
+        (compact ? (
+          <div className="pointer-events-none fixed inset-x-0 bottom-[84px] z-40 flex justify-center px-4 lg:absolute lg:bottom-16 lg:z-10 lg:px-3">
+            <div className="pointer-events-auto w-full max-w-[340px] overflow-hidden rounded-2xl shadow-[0_10px_30px_-8px_rgb(0_0_0/0.45)]">
+              <MapGroupCard
+                markers={groupMarkers}
+                onActiveChange={setGroupActiveId}
+                onClose={closeGroup}
+                onShowAll={showGroupInList}
+                compact
+                className="w-full"
+              />
+            </div>
+          </div>
+        ) : (
+          createPortal(
+            <MapGroupCard
+              markers={groupMarkers}
+              onActiveChange={setGroupActiveId}
+              onClose={closeGroup}
+              onShowAll={showGroupInList}
+            />,
+            popupNode,
+          )
         ))}
       {activeMarker &&
-        createPortal(<PricePin marker={activeMarker} selected={activeMarker.id === selectedId} />, pinNode)}
+        createPortal(
+          <PricePin
+            marker={activeMarker}
+            category={displayCategory(activeMarker, colorCategory)}
+            selected={activeMarker.id === selectedId}
+          />,
+          pinNode,
+        )}
     </div>
   );
 }

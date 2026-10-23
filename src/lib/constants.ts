@@ -1,57 +1,52 @@
 /**
  * Fachliche Stammdaten (Objektarten, Lagen, Ausstattungsmerkmale, Sortierung).
  * Die Werte (value) sind gleichzeitig die Schlüssel in URL, Datenbank und Sync-Service.
+ * Grundlage ist der Objektbestand von BüroHamburg (FileMaker).
  */
 
 export const PROPERTY_CATEGORIES = [
-  { value: "buero-praxis", label: "Büro- und Praxisflächen", types: ["buero", "praxis"] },
-  { value: "laden-gastro", label: "Laden- und Gastroflächen", types: ["laden", "gastro"] },
-  { value: "lager-logistik", label: "Lager- und Logistikflächen", types: ["lager"] },
+  { value: "buero-praxis", label: "Büro- und Praxisflächen", short: "Büro & Praxis", type: "buero" },
+  { value: "laden-gastro", label: "Ladenflächen", short: "Laden", type: "laden" },
+  { value: "lager-logistik", label: "Hallen-, Lager- & Produktionsflächen", short: "Halle & Lager", type: "lager" },
 ] as const;
 
 export type PropertyCategory = (typeof PROPERTY_CATEGORIES)[number]["value"];
 
 export const PROPERTY_TYPES = {
-  buero: { label: "Büro", plural: "Büroflächen", category: "buero-praxis" },
-  praxis: { label: "Praxis", plural: "Praxisflächen", category: "buero-praxis" },
-  laden: { label: "Laden", plural: "Ladenflächen", category: "laden-gastro" },
-  gastro: { label: "Gastro", plural: "Gastroflächen", category: "laden-gastro" },
-  lager: { label: "Lager", plural: "Lagerflächen", category: "lager-logistik" },
-} as const satisfies Record<string, { label: string; plural: string; category: PropertyCategory }>;
+  buero: { label: "Büro/Praxis", category: "buero-praxis" },
+  laden: { label: "Laden", category: "laden-gastro" },
+  lager: { label: "Halle/Lager", category: "lager-logistik" },
+} as const satisfies Record<string, { label: string; category: PropertyCategory }>;
 
 export type PropertyType = keyof typeof PROPERTY_TYPES;
-export const PROPERTY_TYPE_KEYS = Object.keys(PROPERTY_TYPES) as PropertyType[];
 
-export const LOCATION_CLASSES = [
-  { value: "city", label: "City / Innenstadt" },
-  { value: "citynah", label: "Cityrand" },
-  { value: "buerozentrum", label: "Bürozentren" },
-  { value: "peripherie", label: "Peripherie" },
+/** Lagen (Teilmärkte) wie auf buerohamburg.de */
+export const MARKET_AREAS = [
+  { value: "hh-city", label: "HH-City" },
+  { value: "hh-city-sued", label: "HH-City-Süd" },
+  { value: "hh-alster", label: "HH-Alster" },
+  { value: "hh-west", label: "HH-West" },
+  { value: "hh-nord", label: "HH-Nord" },
+  { value: "hh-ost", label: "HH-Ost" },
+  { value: "hh-sued", label: "HH-Süd" },
 ] as const;
 
-export type LocationClass = (typeof LOCATION_CLASSES)[number]["value"];
+export type MarketArea = (typeof MARKET_AREAS)[number]["value"];
 
+/**
+ * Ausstattungsmerkmale (FileMaker-Suchkriterien web_suchKrit01–08 plus Courtage).
+ * \u00AD = weiche Trennstelle: lange Wörter brechen in schmalen Kacheln sauber um, sonst unsichtbar.
+ */
 export const FEATURES = {
   provisionsfrei: "Provisionsfrei",
-  neubau: "Neubau",
   barrierefrei: "Barrierefrei",
-  klimatisiert: "Klimatisiert",
-  stellplaetze: "Stellplätze",
-  aufzug: "Aufzug",
-  glasfaser: "Glasfaser",
-  teekueche: "Teeküche",
-  kantine: "Kantine",
-  dachterrasse: "Dachterrasse",
-  empfang: "Empfang / Concierge",
-  teilbar: "Teilbar",
-  "sofort-verfuegbar": "Sofort verfügbar",
-  denkmalschutz: "Denkmalschutz",
+  stellplaetze: "Hauseigene Parkplätze",
+  "balkon-terrasse": "Balkon / Terrasse",
   wasserblick: "Wasserblick",
-  "oepnv-nah": "ÖPNV-Anbindung",
-  "e-ladestation": "E-Ladestation",
-  schaufenster: "Schaufensterfront",
-  abluft: "Abluftanlage",
-  rampe: "Rampe / Andienung",
+  erdgeschoss: "Erdgeschoss\u00ADfläche",
+  lastenaufzug: "Lasten\u00ADaufzug",
+  personenaufzug: "Personen\u00ADaufzug",
+  neubau: "Neubau",
 } as const;
 
 export type FeatureKey = keyof typeof FEATURES;
@@ -60,10 +55,11 @@ export const FEATURE_KEYS = Object.keys(FEATURES) as FeatureKey[];
 /** Merkmale, die als Schnellfilter direkt unter der Suchleiste angeboten werden. */
 export const QUICK_FEATURES: FeatureKey[] = [
   "provisionsfrei",
-  "neubau",
   "barrierefrei",
-  "klimatisiert",
   "stellplaetze",
+  "balkon-terrasse",
+  "wasserblick",
+  "erdgeschoss",
 ];
 
 /** Merkmale, die als farbige Badges auf den Karten erscheinen (in dieser Priorität). */
@@ -94,6 +90,6 @@ export function categoryLabel(value: PropertyCategory) {
   return PROPERTY_CATEGORIES.find((c) => c.value === value)?.label ?? value;
 }
 
-export function locationClassLabel(value: LocationClass) {
-  return LOCATION_CLASSES.find((l) => l.value === value)?.label ?? value;
+export function marketAreaLabel(value: MarketArea) {
+  return MARKET_AREAS.find((l) => l.value === value)?.label ?? value;
 }

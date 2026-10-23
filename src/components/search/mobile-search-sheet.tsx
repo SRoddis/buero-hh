@@ -2,16 +2,9 @@
 
 import { Check, LoaderCircle, Search, X } from "lucide-react";
 
+import { CategoryDot } from "@/components/listing/category-dot";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import {
-  FEATURE_KEYS,
-  FEATURES,
-  LOCATION_CLASSES,
-  PROPERTY_CATEGORIES,
-  PROPERTY_TYPE_KEYS,
-  PROPERTY_TYPES,
-  type PropertyCategory,
-} from "@/lib/constants";
+import { FEATURE_KEYS, FEATURES, MARKET_AREAS, PROPERTY_CATEGORIES } from "@/lib/constants";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -19,21 +12,12 @@ import { DistrictPicker } from "./district-picker";
 import { AreaRange, RentRange } from "./filter-fields";
 import { toggleValue, useSearch } from "./search-context";
 
-const CATEGORY_SHORT: Record<PropertyCategory, string> = {
-  "buero-praxis": "Büro & Praxis",
-  "laden-gastro": "Laden & Gastro",
-  "lager-logistik": "Lager",
-};
-
 /**
  * Mobiles Such-Fly-up (Bottom-Sheet) im Stil großer Immobilienportale.
  * Alle Änderungen wirken sofort auf die URL; der Button zeigt die aktuelle Trefferzahl.
  */
 export function MobileSearchSheet({ trigger, total }: { trigger: React.ReactNode; total: number }) {
   const { filters, update, reset, isPending } = useSearch();
-  const types = filters.category
-    ? PROPERTY_TYPE_KEYS.filter((t) => PROPERTY_TYPES[t].category === filters.category)
-    : PROPERTY_TYPE_KEYS;
 
   return (
     <Sheet>
@@ -58,7 +42,7 @@ export function MobileSearchSheet({ trigger, total }: { trigger: React.ReactNode
 
           <Section title="Objektart">
             <div className="grid grid-cols-4 rounded-full bg-muted p-1">
-              {[{ value: null, label: "Alle" }, ...PROPERTY_CATEGORIES.map((c) => ({ value: c.value, label: CATEGORY_SHORT[c.value] }))].map(
+              {[{ value: null, label: "Alle" }, ...PROPERTY_CATEGORIES.map((c) => ({ value: c.value, label: c.short }))].map(
                 (option) => {
                   const active = filters.category === option.value;
                   return (
@@ -66,38 +50,19 @@ export function MobileSearchSheet({ trigger, total }: { trigger: React.ReactNode
                       key={option.label}
                       type="button"
                       aria-pressed={active}
-                      onClick={() => {
-                        const category = option.value;
-                        const nextTypes = category
-                          ? filters.types.filter((t) => PROPERTY_TYPES[t].category === category)
-                          : filters.types;
-                        update({ category, types: nextTypes });
-                      }}
+                      onClick={() => update({ category: option.value })}
                       className={cn(
-                        "h-10 rounded-full px-1 text-[13px] leading-tight font-semibold transition-all",
+                        "flex h-10 items-center justify-center gap-1.5 rounded-full px-1 text-[13px] leading-tight font-semibold transition-all",
                         active ? "bg-white text-foreground shadow-sm" : "text-muted-foreground",
                       )}
                     >
+                      {option.value && <CategoryDot category={option.value} className="size-2" />}
                       {option.label}
                     </button>
                   );
                 },
               )}
             </div>
-          </Section>
-
-          <Section title="Nutzungsart">
-            <PillGroup>
-              {types.map((type) => (
-                <Pill
-                  key={type}
-                  active={filters.types.includes(type)}
-                  onClick={() => update({ types: toggleValue(filters.types, type) })}
-                >
-                  {PROPERTY_TYPES[type].plural}
-                </Pill>
-              ))}
-            </PillGroup>
           </Section>
 
           <Section title="Miete in € pro m²">
@@ -110,14 +75,14 @@ export function MobileSearchSheet({ trigger, total }: { trigger: React.ReactNode
 
           <Section title="Lage">
             <PillGroup>
-              <Pill active={filters.locationClass === null} onClick={() => update({ locationClass: null })}>
+              <Pill active={filters.marketArea === null} onClick={() => update({ marketArea: null })}>
                 Alle Lagen
               </Pill>
-              {LOCATION_CLASSES.map((l) => (
+              {MARKET_AREAS.map((l) => (
                 <Pill
                   key={l.value}
-                  active={filters.locationClass === l.value}
-                  onClick={() => update({ locationClass: filters.locationClass === l.value ? null : l.value })}
+                  active={filters.marketArea === l.value}
+                  onClick={() => update({ marketArea: filters.marketArea === l.value ? null : l.value })}
                 >
                   {l.label}
                 </Pill>

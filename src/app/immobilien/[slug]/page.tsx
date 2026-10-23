@@ -1,4 +1,4 @@
-import { ChevronRight, MapPin } from "lucide-react";
+import { ChevronRight, FileText, MapPin } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -14,15 +14,14 @@ import { ListingBadges } from "@/components/listing/listing-badges";
 import { ListingCard } from "@/components/listing/listing-card";
 import { LocationMap } from "@/components/map/location-map-lazy";
 import { Button } from "@/components/ui/button";
-import { categoryLabel, FEATURES, locationClassLabel, PROPERTY_TYPES } from "@/lib/constants";
+import { categoryLabel, FEATURES, marketAreaLabel } from "@/lib/constants";
 import { getRepository } from "@/lib/data/repository";
 import {
-  formatAreaRange,
-  formatAvailability,
-  formatDate,
-  formatFloorRange,
-  formatRent,
+  formatArea,
+  formatCommission,
+  formatFurtherAreas,
   formatRentLabel,
+  formatRentPerSqmHint,
 } from "@/lib/format";
 import { DEFAULT_FILTERS, filtersToHref } from "@/lib/search/params";
 
@@ -48,29 +47,28 @@ export default async function ListingDetailPage({ params }: { params: Params }) 
   const similar = await (await getRepository()).getSimilar(listing, 3);
   const { building } = listing;
 
+  const furtherAreas = formatFurtherAreas(listing);
+
   const facts = [
-    { label: "Mietfläche", value: formatAreaRange(listing.areaMin, listing.areaMax) },
+    { label: "Mietfläche", value: formatArea(listing.area), hint: furtherAreas ? `weitere Flächen: ${furtherAreas}` : undefined },
     {
-      label: "Miete",
+      label: listing.priceType === "monat" ? "Miete pauschal" : "Miete",
       value: formatRentLabel(listing),
-      hint: listing.rentMin != null ? "netto kalt zzgl. NK" : undefined,
+      hint: formatRentPerSqmHint(listing) ?? undefined,
     },
-    { label: "Etage", value: formatFloorRange(listing.floorMin, listing.floorMax) },
-    { label: "Verfügbar", value: formatAvailability(listing.availableFrom) },
-    { label: "Provision", value: listing.commissionFree ? "provisionsfrei" : "nach Vereinbarung" },
+    { label: "Nebenkosten", value: listing.priceNote ?? "auf Anfrage" },
+    { label: "Courtage", value: formatCommission(listing) },
+    { label: "Lage", value: marketAreaLabel(listing.marketArea), hint: listing.districtName },
   ];
 
   const objectData = [
-    ["Objekt-Nr.", listing.id.toUpperCase()],
-    ["Objektart", categoryLabel(listing.category)],
-    ["Nutzung", PROPERTY_TYPES[listing.type].plural],
-    ["Lage", locationClassLabel(listing.locationClass)],
-    ["Gebäude", building.name],
-    ["Baujahr", building.yearBuilt],
-    ["Modernisierung", building.yearRenovated],
-    ["Geschosse", building.floors],
-    ["Online seit", formatDate(listing.publishedAt)],
-  ].filter(([, value]) => value != null) as [string, string | number][];
+    ["Objekt-Nr.", listing.referenceNumber],
+    ["Objektart", listing.categories.map(categoryLabel).join(", ")],
+    ["Lage", marketAreaLabel(listing.marketArea)],
+    ["Stadtteil", listing.districtName],
+    ["Adresse", [building.street, building.houseNumber].filter(Boolean).join(" ")],
+    ["Weitere Flächen im Objekt", furtherAreas],
+  ].filter(([, value]) => value != null && value !== "") as [string, string][];
 
   return (
     <main className="pb-24 lg:pb-12">
@@ -93,7 +91,7 @@ export default async function ListingDetailPage({ params }: { params: Params }) 
           <div className="min-w-0 space-y-10">
             <header className="space-y-3">
               <div className="flex items-start justify-between gap-4">
-                <ListingBadges type={listing.type} features={listing.features} max={3} className="[&>span]:border [&>span]:shadow-none" />
+                <ListingBadges categories={listing.categories} features={listing.features} max={3} className="[&>span]:border [&>span]:shadow-none" />
                 <div className="flex shrink-0 gap-2">
                   <ShareButton title={listing.title} />
                   <FavoriteButton listingId={listing.id} variant="outline" />
@@ -124,6 +122,7 @@ export default async function ListingDetailPage({ params }: { params: Params }) 
               </div>
             </Section>
 
+            {listing.features.length > 0 && (
             <Section title="Ausstattung & Eigenschaften">
               <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                 {listing.features.map((feature) => {
@@ -139,16 +138,17 @@ export default async function ListingDetailPage({ params }: { params: Params }) 
                 })}
               </ul>
             </Section>
+            )}
 
-            <Section title={listing.units.length > 1 ? `Mietflächen (${listing.units.length})` : "Mietfläche"}>
-              <UnitsTable units={listing.units} />
-              {listing.rentMin != null && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Alle Mietpreise netto kalt zzgl. Nebenkosten und gesetzlicher Umsatzsteuer. Ab{" "}
-                  {formatRent(listing.rentMin)} / m².
-                </p>
-              )}
-            </Section>
+            {listing.units.length > 1 && (
+              <Section title={`Mietflächen (${listing.units.length})`}>
+                <UnitsTable units={listing.units} />
+              </Section>
+            )}
+
+            {listing.commissionNote && (
+              <p className="-mt-4 rounded-lg bg-muted/60 px-4 py-3 text-sm text-muted-foreground">{listing.commissionNote}</p>
+            )}
 
             <Section title="Objektdaten">
               <dl className="grid gap-x-8 rounded-xl border bg-white px-5 py-2 sm:grid-cols-2">
@@ -163,9 +163,11 @@ export default async function ListingDetailPage({ params }: { params: Params }) 
 
             <Section title="Lage">
               <div className="overflow-hidden rounded-xl border bg-white">
-                <div className="h-72 sm:h-80">
-                  <LocationMap lat={listing.lat} lng={listing.lng} />
-                </div>
+                {listing.lat != null && listing.lng != null && (
+                  <div className="h-72 sm:h-80">
+                    <LocationMap lat={listing.lat} lng={listing.lng} />
+                  </div>
+                )}
                 <div className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
                   <span className="flex items-center gap-2">
                     <MapPin className="size-4 text-brand" />
@@ -188,8 +190,19 @@ export default async function ListingDetailPage({ params }: { params: Params }) 
                 <p className="text-sm text-muted-foreground">Mietpreis</p>
                 <p className="text-2xl font-bold">{formatRentLabel(listing)}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {formatAreaRange(listing.areaMin, listing.areaMax)} · {listing.districtName}
+                  {[formatRentPerSqmHint(listing), listing.priceNote].filter(Boolean).join(" · ")}
                 </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {formatArea(listing.area)} · {listing.districtName}
+                </p>
+                {listing.exposeUrl && (
+                  <Button asChild variant="outline" className="mt-4 h-10 w-full gap-2">
+                    <a href={listing.exposeUrl} target="_blank" rel="noopener noreferrer">
+                      <FileText className="size-4" />
+                      Exposé als PDF
+                    </a>
+                  </Button>
+                )}
               </div>
               <ContactForm propertyId={listing.id} title={listing.title} contact={listing.contact} />
             </div>
@@ -212,7 +225,7 @@ export default async function ListingDetailPage({ params }: { params: Params }) 
       <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-4 border-t bg-white px-4 py-3 shadow-[0_-4px_20px_rgb(0_0_0/0.08)] lg:hidden">
         <div className="min-w-0">
           <p className="truncate text-base font-bold">{formatRentLabel(listing)}</p>
-          <p className="truncate text-xs text-muted-foreground">{formatAreaRange(listing.areaMin, listing.areaMax)}</p>
+          <p className="truncate text-xs text-muted-foreground">{formatArea(listing.area)}</p>
         </div>
         <Button asChild size="lg" className="h-11 px-6">
           <a href="#kontakt">Jetzt anfragen</a>

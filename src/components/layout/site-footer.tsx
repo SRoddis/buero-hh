@@ -6,13 +6,14 @@ import { filtersToHref, DEFAULT_FILTERS } from "@/lib/search/params";
 
 import { Logo } from "./logo";
 
+/** Stadtteile mit den meisten Angeboten */
 const POPULAR_DISTRICTS = [
-  { slug: "hafencity", name: "HafenCity" },
   { slug: "altstadt", name: "Altstadt" },
   { slug: "neustadt", name: "Neustadt" },
-  { slug: "winterhude", name: "Winterhude" },
-  { slug: "city-nord", name: "City Nord" },
-  { slug: "ottensen", name: "Ottensen" },
+  { slug: "hammerbrook", name: "Hammerbrook" },
+  { slug: "bahrenfeld", name: "Bahrenfeld" },
+  { slug: "st-georg", name: "St. Georg" },
+  { slug: "hafencity", name: "HafenCity" },
 ];
 
 export function SiteFooter() {
@@ -47,10 +48,10 @@ export function SiteFooter() {
             <MapPinIcon className="mt-0.5 size-4 shrink-0" /> Hamburg
           </li>
           <li className="flex items-center gap-2">
-            <PhoneIcon className="size-4 shrink-0" /> +49 40 300 865 0
+            <PhoneIcon className="size-4 shrink-0" /> +49 40 226 211 00
           </li>
           <li className="flex items-center gap-2">
-            <MailIcon className="size-4 shrink-0" /> info@buerohamburg.de
+            <MailIcon className="size-4 shrink-0" /> kontakt@buerohamburg.de
           </li>
         </FooterColumn>
       </div>

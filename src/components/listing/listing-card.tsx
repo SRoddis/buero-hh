@@ -1,11 +1,12 @@
 "use client";
 
-import { ArrowRight, DoorOpen, Layers, MapPin, Ruler } from "lucide-react";
+import { ArrowRight, Layers, MapPin, MapPinned, Ruler } from "lucide-react";
 import Link from "next/link";
 import { forwardRef } from "react";
 
 import { FavoriteButton } from "@/components/favorites/favorite-button";
-import { formatAreaRange, formatFloorRange, formatRentLabel } from "@/lib/format";
+import { marketAreaLabel } from "@/lib/constants";
+import { formatArea, formatFurtherAreas, formatRentLabel, formatRentPerSqmHint } from "@/lib/format";
 import type { ListingSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,8 @@ export const ListingCard = forwardRef<HTMLElement, ListingCardProps>(function Li
   { listing, highlighted, onHoverChange, priority, className },
   ref,
 ) {
+  const furtherAreas = formatFurtherAreas(listing);
+
   return (
     <article
       ref={ref}
@@ -41,14 +44,14 @@ export const ListingCard = forwardRef<HTMLElement, ListingCardProps>(function Li
         priority={priority}
         sizes="(min-width: 1536px) 22vw, (min-width: 1024px) 28vw, (min-width: 640px) 50vw, 100vw"
       >
-        <ListingBadges type={listing.type} features={listing.features} className="absolute bottom-3 left-3" />
+        <ListingBadges categories={listing.categories} features={listing.features} className="absolute bottom-3 left-3" />
         <FavoriteButton listingId={listing.id} className="absolute top-3 right-3 z-10" />
       </ImageCarousel>
 
       <div className="flex flex-1 flex-col gap-2.5 p-4">
         <div>
           <h3 className="line-clamp-1 text-base font-semibold text-foreground">
-            <Link href={`/immobilien/${listing.slug}`} className="after:absolute after:inset-0">
+            <Link href={`/immobilien/${listing.slug}`} target="_blank" rel="noopener" className="after:absolute after:inset-0">
               {listing.title}
             </Link>
           </h3>
@@ -59,27 +62,25 @@ export const ListingCard = forwardRef<HTMLElement, ListingCardProps>(function Li
         </div>
 
         <dl className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground">
-          <Fact icon={Ruler} label="Fläche">
-            {formatAreaRange(listing.areaMin, listing.areaMax)}
+          <Fact icon={Ruler} label="Mietfläche">
+            {formatArea(listing.area)}
           </Fact>
-          <Fact icon={DoorOpen} label="Räume">
-            {listing.rooms != null
-              ? `${listing.rooms} ${listing.rooms === 1 ? "Raum" : "Räume"}`
-              : listing.unitCount > 1
-                ? "flexibel"
-                : "offen"}
-          </Fact>
-          <Fact icon={Layers} label="Etage">
-            {formatFloorRange(listing.floorMin, listing.floorMax)}
+          {furtherAreas && (
+            <Fact icon={Layers} label="Weitere Flächen im Objekt">
+              im Objekt {furtherAreas}
+            </Fact>
+          )}
+          <Fact icon={MapPinned} label="Lage">
+            {marketAreaLabel(listing.marketArea)}
           </Fact>
         </dl>
 
         <div className="mt-auto flex items-end justify-between pt-1">
           <p className="text-lg font-bold text-foreground">
             {formatRentLabel(listing)}
-            {listing.rentMin != null && (
-              <span className="ml-1.5 text-xs font-normal text-muted-foreground">zzgl. NK</span>
-            )}
+            <span className="block text-xs font-normal text-muted-foreground">
+              {[formatRentPerSqmHint(listing), listing.priceNote].filter(Boolean).join(" · ")}
+            </span>
           </p>
           <ArrowRight className="size-5 text-brand transition-transform group-hover:translate-x-1" />
         </div>

@@ -1,6 +1,13 @@
 import "server-only";
 
-import { PAGE_SIZE, type FeatureKey, type LocationClass, type PropertyCategory, type PropertyType } from "@/lib/constants";
+import {
+  PAGE_SIZE,
+  type FeatureKey,
+  type MarketArea,
+  type PropertyCategory,
+  type PropertyType,
+} from "@/lib/constants";
+import type { Database } from "@/lib/supabase/database.types";
 import { getSupabase } from "@/lib/supabase/server";
 import type {
   Building,
@@ -16,133 +23,131 @@ import type {
   SearchResult,
 } from "@/lib/types";
 
-import type { Database } from "@/lib/supabase/database.types";
-
+import { DEFAULT_CONTACT } from "./contact";
 import type { PropertyRepository } from "./repository";
 
-/** Zeile der View `property_listings` (siehe supabase/migrations). */
+/** Zeile der View `property_listings` (JSON-Spalten sind in den generierten Typen nur als Json typisiert). */
 interface ListingRow {
   id: string;
+  reference_number: string;
   slug: string;
   title: string;
   teaser: string;
   description: string;
   category: PropertyCategory;
+  categories: PropertyCategory[];
   property_type: PropertyType;
+  price_type: "qm" | "monat";
+  price_note: string | null;
   commission_free: boolean;
-  published_at: string | null;
-  location_class: LocationClass;
+  commission_months: number | null;
+  commission_note: string | null;
+  expose_pdf_url: string | null;
+  featured_rank: number | null;
+  market_area: MarketArea;
   district_slug: string;
   district_name: string;
   address: string;
-  lat: number;
-  lng: number;
-  area_min: number;
-  area_max: number;
-  rent_min: number | null;
-  rent_max: number | null;
-  rooms: number | null;
-  floor_min: number;
-  floor_max: number;
-  unit_count: number;
-  available_from: string | null;
+  lat: number | null;
+  lng: number | null;
+  area: number;
+  area_range_min: number | null;
+  area_range_max: number | null;
+  rent_per_sqm: number | null;
+  rent_total_monthly: number | null;
   features: FeatureKey[];
   images: PropertyImage[];
   units: RentalUnit[];
-  building: Omit<Building, "districtSlug" | "districtName" | "lat" | "lng" | "locationClass">;
+  building: Building;
   contact: Contact | null;
 }
 
 const SUMMARY_COLUMNS =
-  "id,slug,title,teaser,category,property_type,commission_free,published_at,location_class,district_slug,district_name,address,lat,lng,area_min,area_max,rent_min,rent_max,rooms,floor_min,floor_max,unit_count,available_from,features,images";
+  // reference_sort wird für die Sortierung benötigt (PostgREST sortiert RPC-Ergebnisse nur nach ausgewählten Spalten)
+  "id,reference_number,reference_sort,slug,title,teaser,category,categories,property_type,price_type,price_note,commission_free,commission_months,featured_rank,market_area,district_slug,district_name,address,lat,lng,area,area_range_min,area_range_max,rent_per_sqm,rent_total_monthly,features,images";
 
 const MARKER_COLUMNS =
-  "id,slug,title,category,property_type,lat,lng,area_min,area_max,rent_min,rooms,address,district_name,images";
+  "id,slug,title,category,categories,property_type,lat,lng,area,rent_per_sqm,rent_total_monthly,price_type,address,district_name,images";
 
-const SORT_COLUMNS: Record<SearchFilters["sort"], { column: string; ascending: boolean }> = {
-  relevanz: { column: "published_at", ascending: false },
-  neueste: { column: "published_at", ascending: false },
-  "miete-asc": { column: "rent_min", ascending: true },
-  "miete-desc": { column: "rent_min", ascending: false },
-  "flaeche-asc": { column: "area_min", ascending: true },
-  "flaeche-desc": { column: "area_max", ascending: false },
+/** Sortierung über PostgREST; Relevanz = Hervorhebung zuerst, danach die neuesten Objekte */
+const SORT_COLUMNS: Record<SearchFilters["sort"], { column: string; ascending: boolean }[]> = {
+  relevanz: [
+    { column: "featured_rank", ascending: true },
+    { column: "reference_sort", ascending: false },
+  ],
+  neueste: [{ column: "reference_sort", ascending: false }],
+  "miete-asc": [{ column: "rent_per_sqm", ascending: true }],
+  "miete-desc": [{ column: "rent_per_sqm", ascending: false }],
+  "flaeche-asc": [{ column: "area", ascending: true }],
+  "flaeche-desc": [{ column: "area", ascending: false }],
 };
 
-const FALLBACK_CONTACT: Contact = {
-  id: "default",
-  name: "BüroHamburg Vermietung",
-  role: "Gewerbeimmobilien Hamburg",
-  email: "info@buerohamburg.de",
-  phone: "+49 40 300 865 0",
-  imageUrl: null,
-};
+const toNumber = (value: number | string | null) => (value == null ? null : Number(value));
 
 function toSummary(row: ListingRow): ListingSummary {
   return {
     id: row.id,
     slug: row.slug,
+    referenceNumber: row.reference_number,
     title: row.title,
     teaser: row.teaser,
     category: row.category,
+    categories: row.categories,
     type: row.property_type,
     districtSlug: row.district_slug,
     districtName: row.district_name,
+    marketArea: row.market_area,
     address: row.address,
     lat: row.lat,
     lng: row.lng,
-    locationClass: row.location_class,
-    areaMin: Number(row.area_min),
-    areaMax: Number(row.area_max),
-    rentMin: row.rent_min != null ? Number(row.rent_min) : null,
-    rentMax: row.rent_max != null ? Number(row.rent_max) : null,
-    rooms: row.rooms,
-    floorMin: row.floor_min,
-    floorMax: row.floor_max,
-    unitCount: row.unit_count,
-    availableFrom: row.available_from,
-    features: row.features,
+    area: Number(row.area),
+    areaRangeMin: toNumber(row.area_range_min),
+    areaRangeMax: toNumber(row.area_range_max),
+    rentPerSqm: toNumber(row.rent_per_sqm),
+    rentTotalMonthly: toNumber(row.rent_total_monthly),
+    priceType: row.price_type,
+    priceNote: row.price_note,
     commissionFree: row.commission_free,
+    commissionMonths: toNumber(row.commission_months),
+    features: row.features,
     images: row.images ?? [],
-    publishedAt: row.published_at ?? new Date(0).toISOString(),
+    featuredRank: row.featured_rank,
   };
 }
 
 function toListing(row: ListingRow): Listing {
-  const summary = toSummary(row);
   return {
-    ...summary,
+    ...toSummary(row),
     description: row.description,
-    building: {
-      ...row.building,
-      districtSlug: row.district_slug,
-      districtName: row.district_name,
-      lat: row.lat,
-      lng: row.lng,
-      locationClass: row.location_class,
-    },
+    commissionNote: row.commission_note,
+    exposeUrl: row.expose_pdf_url,
+    building: row.building,
     units: row.units.map((u) => ({
       ...u,
       areaSqm: Number(u.areaSqm),
-      rentPerSqm: u.rentPerSqm != null ? Number(u.rentPerSqm) : null,
-      serviceChargePerSqm: u.serviceChargePerSqm != null ? Number(u.serviceChargePerSqm) : null,
+      rentPerSqm: toNumber(u.rentPerSqm),
+      rentTotalMonthly: toNumber(u.rentTotalMonthly),
+      serviceChargePerSqm: toNumber(u.serviceChargePerSqm),
     })),
-    contact: row.contact ?? FALLBACK_CONTACT,
+    contact: row.contact ?? DEFAULT_CONTACT,
   };
 }
 
-function toMarker(row: Pick<ListingRow, "id" | "slug" | "title" | "category" | "property_type" | "lat" | "lng" | "area_min" | "area_max" | "rent_min" | "rooms" | "address" | "district_name" | "images">): MapMarker {
+function toMarker(row: ListingRow): MapMarker | null {
+  if (row.lat == null || row.lng == null) return null;
   return {
     id: row.id,
     slug: row.slug,
     title: row.title,
     category: row.category,
+    categories: row.categories,
     type: row.property_type,
     lat: row.lat,
     lng: row.lng,
-    areaMin: Number(row.area_min),
-    areaMax: Number(row.area_max),
-    rentMin: row.rent_min != null ? Number(row.rent_min) : null,
-    rooms: row.rooms,
+    area: Number(row.area),
+    rentPerSqm: toNumber(row.rent_per_sqm),
+    rentTotalMonthly: toNumber(row.rent_total_monthly),
+    priceType: row.price_type,
     address: row.address,
     districtName: row.district_name,
     images: (row.images ?? []).slice(0, 5),
@@ -157,8 +162,7 @@ function searchArgs(f: SearchFilters): SearchArgs {
   return {
     p_districts: f.districts.length ? f.districts : undefined,
     p_category: orUndefined(f.category),
-    p_types: f.types.length ? f.types : undefined,
-    p_location_class: orUndefined(f.locationClass),
+    p_market_area: orUndefined(f.marketArea),
     p_area_min: orUndefined(f.areaMin),
     p_area_max: orUndefined(f.areaMax),
     p_rent_min: orUndefined(f.rentMin),
@@ -168,26 +172,28 @@ function searchArgs(f: SearchFilters): SearchArgs {
   };
 }
 
+const UUID = /^[0-9a-f-]{36}$/i;
+/** Maximale Zeilenzahl pro Abfrage (Supabase-Standard „max rows“) */
+const MAX_ROWS = 1000;
+
 export class SupabasePropertyRepository implements PropertyRepository {
   private db = getSupabase();
 
   async search(filters: SearchFilters): Promise<SearchResult> {
     const args = searchArgs(filters);
-    const sort = SORT_COLUMNS[filters.sort];
     const from = (filters.page - 1) * PAGE_SIZE;
 
-    const [page, markers] = await Promise.all([
-      this.db
-        .rpc("search_properties", args, { count: "exact" })
-        .select(SUMMARY_COLUMNS)
-        .order(sort.column, { ascending: sort.ascending, nullsFirst: false })
-        .order("id")
-        .range(from, from + PAGE_SIZE - 1),
-      this.db.rpc("search_properties", args).select(MARKER_COLUMNS).limit(2000),
+    let pageQuery = this.db.rpc("search_properties", args, { count: "exact" }).select(SUMMARY_COLUMNS);
+    for (const { column, ascending } of SORT_COLUMNS[filters.sort]) {
+      pageQuery = pageQuery.order(column, { ascending, nullsFirst: false });
+    }
+
+    const [page, markerRows] = await Promise.all([
+      pageQuery.order("id").range(from, from + PAGE_SIZE - 1),
+      this.allMarkerRows(args),
     ]);
 
     if (page.error) throw page.error;
-    if (markers.error) throw markers.error;
 
     const total = page.count ?? 0;
     return {
@@ -195,8 +201,23 @@ export class SupabasePropertyRepository implements PropertyRepository {
       total,
       page: filters.page,
       pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)),
-      markers: (markers.data as unknown as ListingRow[]).map(toMarker),
+      markers: markerRows.map(toMarker).filter((m): m is MapMarker => m !== null),
     };
+  }
+
+  /** Supabase liefert höchstens 1.000 Zeilen pro Abfrage – Kartenpunkte daher seitenweise laden. */
+  private async allMarkerRows(args: SearchArgs): Promise<ListingRow[]> {
+    const rows: ListingRow[] = [];
+    for (let from = 0; ; from += MAX_ROWS) {
+      const { data, error } = await this.db
+        .rpc("search_properties", args)
+        .select(MARKER_COLUMNS)
+        .order("id")
+        .range(from, from + MAX_ROWS - 1);
+      if (error) throw error;
+      rows.push(...(data as unknown as ListingRow[]));
+      if (data.length < MAX_ROWS) return rows;
+    }
   }
 
   async getBySlug(slug: string) {
@@ -207,12 +228,11 @@ export class SupabasePropertyRepository implements PropertyRepository {
       .eq("status", "published")
       .maybeSingle();
     if (error) throw error;
-    // JSON-Spalten (units, images, building, contact) sind in den generierten Typen nur als Json typisiert
     return data ? toListing(data as unknown as ListingRow) : null;
   }
 
   async getByIds(ids: string[]) {
-    const uuids = ids.filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+    const uuids = ids.filter((id) => UUID.test(id));
     if (!uuids.length) return [];
     const { data, error } = await this.db
       .from("property_listings")
@@ -225,10 +245,10 @@ export class SupabasePropertyRepository implements PropertyRepository {
 
   async getSimilar(listing: Listing, limit = 3) {
     const { data, error } = await this.db
-      .rpc("search_properties", { p_category: listing.category })
+      .rpc("search_properties", { p_category: listing.category, p_market_area: listing.marketArea })
       .select(SUMMARY_COLUMNS)
       .neq("id", listing.id)
-      .limit(30);
+      .limit(40);
     if (error) throw error;
     return (data as unknown as ListingRow[])
       .map(toSummary)
@@ -239,21 +259,20 @@ export class SupabasePropertyRepository implements PropertyRepository {
   async listDistricts(): Promise<District[]> {
     const { data, error } = await this.db
       .from("districts")
-      .select("slug,name,borough,location_class,center_lng,center_lat")
+      .select("slug,name,market_area,center_lng,center_lat")
       .order("name");
     if (error) throw error;
     return data.map((d) => ({
       slug: d.slug,
       name: d.name,
-      borough: d.borough,
-      locationClass: d.location_class,
-      center: [d.center_lng, d.center_lat] as [number, number],
+      marketArea: d.market_area,
+      center: d.center_lng != null && d.center_lat != null ? [d.center_lng, d.center_lat] : null,
     }));
   }
 
   async createInquiry(input: InquiryInput) {
     const { error } = await this.db.from("inquiries").insert({
-      property_id: /^[0-9a-f-]{36}$/i.test(input.propertyId) ? input.propertyId : null,
+      property_id: UUID.test(input.propertyId) ? input.propertyId : null,
       name: input.name,
       company: input.company ?? null,
       email: input.email,
@@ -264,11 +283,10 @@ export class SupabasePropertyRepository implements PropertyRepository {
   }
 }
 
+/** Ähnlichkeit: gleicher Stadtteil, vergleichbare Größe */
 function score(candidate: ListingSummary, listing: Listing) {
   return (
-    (candidate.districtSlug === listing.districtSlug ? 3 : 0) +
-    (candidate.type === listing.type ? 2 : 0) +
-    (candidate.locationClass === listing.locationClass ? 1 : 0)
+    (candidate.districtSlug === listing.districtSlug ? 3 : 0) -
+    Math.abs(Math.log((candidate.area || 1) / (listing.area || 1)))
   );
 }
-

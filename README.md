@@ -11,13 +11,15 @@ npm install          # kopiert auch den MapLibre-Worker nach public/vendor/
 npm run dev          # http://localhost:3000 → /immobilien
 ```
 
-Ohne weitere Konfiguration läuft die App mit **44 realistischen Mock-Objekten** aus Hamburg.
+Ohne Supabase-Konfiguration läuft die App im Mock-Modus mit **160 echten Objekten** von buerohamburg.de (`src/lib/data/mock/fixture.json`). Mit Supabase stehen alle **1.165 Objekte** zur Verfügung.
 
 | Script | Zweck |
 | --- | --- |
 | `npm run dev` / `build` / `start` | Entwicklung / Produktion |
 | `npm run lint`, `npm run typecheck` | Qualitätsprüfungen |
-| `npm run db:seed:generate` | erzeugt `supabase/seed.sql` aus den Mock-Daten |
+| `npm run scrape` | Objektbestand von buerohamburg.de abrufen (`data/scrape/`, siehe unten) |
+| `npm run db:seed:generate` | erzeugt `supabase/seed/*.sql` und die Mock-Daten aus dem Scrape |
+| `npm run db:seed:linked` | Seed-Pakete ins verknüpfte Supabase-Projekt einspielen |
 | `npm run db:push` | neue Migrationen ins verknüpfte Supabase-Projekt einspielen |
 | `npm run db:types` | TypeScript-Typen aus dem Datenbankschema generieren |
 
@@ -82,14 +84,29 @@ Das Projekt ist mit Supabase Cloud verknüpft (`supabase/config.toml`, CLI als D
    ```
 4. Nach Schemaänderungen: neue Datei unter `supabase/migrations/`, dann `npm run db:push` und `npm run db:types`.
 
+### Daten von buerohamburg.de übernehmen
+
+Bis der FileMaker-Sync läuft, kommt der Objektbestand von der JSON-API, die auch buerohamburg.de selbst nutzt:
+
+```bash
+npm run scrape                 # Objekte, Details, Bild-URLs, PDF-Infos → data/scrape/ (CSV + JSON, nicht im Git)
+npm run db:seed:generate       # → supabase/seed/*.sql (alle Objekte) und src/lib/data/mock/fixture.json
+npm run db:seed:linked         # Seed-Pakete einspielen (idempotent, kann wiederholt werden)
+```
+
+- Quelle: `/api/objects/search` (Liste), `/api/objects/<nr>` (Details), Bilder `/objects/images/<nr>/NN_webBig.jpg`, Exposé `/objects/pdf/BHI_<nr>.pdf`
+- Die Umwandlung steckt in `scripts/lib/buerohamburg-transform.ts` (Feldzuordnung FileMaker → App, z. B. `web_suchKrit01–08` → Ausstattungsmerkmale, Courtage-Codes `bc`/`no` = courtagefrei)
+- Gleiche Adressen werden zu einem Gebäude zusammengefasst; Schlüssel ist die Objektnummer (`source = 'filemaker'`, `external_id`)
+- Bilder und PDFs werden vorerst direkt von buerohamburg.de geladen
+
 ### Datenmodell
 
 | Tabelle | Inhalt |
 | --- | --- |
-| `districts` | Stadtteile mit Bezirk, Mittelpunkt und Büromarkt-Lage |
-| `buildings` | Gebäude: Adresse, `geography(Point)` mit GiST-Index, Baujahr, Gebäudemerkmale |
-| `properties` | Vermarktungsobjekt: Titel, Texte, Nutzungsart, Status, Provision, Objektmerkmale |
-| `rental_units` | einzelne Mietflächen: Etage, Fläche, Miete/NK je m², verfügbar ab, teilbar |
+| `districts` | Stadtteile mit Lage (HH-City, HH-Alster, …) und Mittelpunkt |
+| `buildings` | Gebäude: Adresse, Lage, `geography(Point)` mit GiST-Index |
+| `properties` | Objekt: Objektnummer, Titel, Texte, Objektart(en), Preisart, Nebenkosten, Courtage, Merkmale, weitere Flächen, Exposé-PDF, Hervorhebung |
+| `rental_units` | Mietflächen: Fläche, Miete je m² bzw. Pauschalmiete pro Monat |
 | `property_images` | Bilder (Supabase Storage, Bucket `property-images`) |
 | `contacts` | Ansprechpartner |
 | `inquiries` | Kontaktanfragen aus dem Exposé (anonymes Insert per RLS) |
@@ -121,7 +138,7 @@ npm run sync            # einmalig; SYNC_INTERVAL_MINUTES für Daemon-Betrieb
 ## Hinweise
 
 - **Karte:** Standardstil ist OpenFreeMap „Positron“ (kostenlos, ohne API-Key). Für den Produktivbetrieb ggf. eigenen Stil/Anbieter über `NEXT_PUBLIC_MAP_STYLE_URL` setzen.
-- **Bilder:** Mock-Daten nutzen Unsplash-Fotos; produktiv kommen die Bilder aus Supabase Storage.
-- **Mock-Inhalte:** Ansprechpartner, Telefonnummern und E-Mail-Adressen sind fiktiv.
+- **Bilder & PDFs:** werden aktuell von buerohamburg.de geladen; später über den Sync in Supabase Storage.
+- **Ansprechpartner:** Objekte ohne zugeordneten Kontakt zeigen den allgemeinen BüroHamburg-Kontakt.
 - Inhaltsseiten (Home, Über uns, Für Vermieter, Suchauftrag, Impressum, Datenschutz) verlinken vorerst auf www.buerohamburg.de.
 - Bewusst nicht enthalten: Registrierung/Login und ein eigenes Verwaltungsbackend.

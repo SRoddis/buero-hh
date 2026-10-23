@@ -1,76 +1,162 @@
 /**
- * Erzeugt supabase/seed.sql aus den Mock-Daten, damit Frontend-Mocks und Datenbank
- * denselben Bestand haben. Aufruf: npm run db:seed:generate
+ * Erzeugt aus den gescrapten Daten (data/scrape/buerohamburg.json, siehe `npm run scrape`):
+ *   - supabase/seed/NNN.sql              kompletter Objektbestand für Supabase, in Paketen
+ *                                        (die Management-API nimmt nur begrenzt große Abfragen an)
+ *   - src/lib/data/mock/fixture.json     repräsentative Auswahl für den Mock-Modus
  *
- * IDs werden deterministisch per md5(...)::uuid erzeugt – der Seed ist wiederholbar.
+ * Aufruf: npm run db:seed:generate – einspielen mit: npm run db:seed:linked
+ *
+ * IDs werden deterministisch per md5(...)::uuid aus der Objektnummer erzeugt – der Seed ist
+ * wiederholbar und passt zu den Schlüsseln (source = 'filemaker', external_id = Objektnummer),
+ * die später auch der FileMaker-Sync verwendet.
  */
-import { writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { DISTRICTS } from "../src/lib/data/mock/districts";
-import { BUILDING_FEATURES, CONTACTS, MOCK_LISTINGS } from "../src/lib/data/mock/listings";
+import type { Listing } from "../src/lib/types";
 
-const DERIVED = new Set(["provisionsfrei", "sofort-verfuegbar", "teilbar"]);
+import { transform, type ScrapedObject } from "./lib/buerohamburg-transform";
 
+const FIXTURE_SIZE = 160;
+/** Maximale Größe eines Seed-Pakets in Bytes */
+const SEED_CHUNK_BYTES = 300_000;
+const NL = "\n";
+
+const scraped: ScrapedObject[] = JSON.parse(
+  readFileSync(join(process.cwd(), "data", "scrape", "buerohamburg.json"), "utf8"),
+);
+const { listings, districts } = transform(scraped);
+
+// ---------------------------------------------------------------------------
+// Seed-Pakete – jedes Statement ist idempotent (on conflict do nothing), damit
+// abgebrochene Läufe gefahrlos wiederholt werden können
+// ---------------------------------------------------------------------------
 const q = (v: string | number | boolean | null | undefined) =>
   v === null || v === undefined ? "null" : typeof v === "string" ? `'${v.replace(/'/g, "''")}'` : String(v);
 const uuid = (key: string) => `md5(${q(key)})::uuid`;
 const textArray = (values: string[]) => (values.length ? `array[${values.map(q).join(", ")}]::text[]` : "'{}'::text[]");
-const point = (lng: number, lat: number) => `extensions.st_setsrid(extensions.st_makepoint(${lng.toFixed(6)}, ${lat.toFixed(6)}), 4326)::extensions.geography`;
+const enumArray = (values: string[], type: string) => `array[${values.map(q).join(", ")}]::${type}[]`;
+const point = (lng: number | null, lat: number | null) =>
+  lng == null || lat == null
+    ? "null"
+    : `extensions.st_setsrid(extensions.st_makepoint(${lng.toFixed(7)}, ${lat.toFixed(7)}), 4326)::extensions.geography`;
 
-const lines: string[] = [
-  "-- Automatisch generiert durch scripts/generate-seed.ts – nicht manuell bearbeiten.",
-  "begin;",
-  "",
-  "insert into districts (slug, name, borough, center_lng, center_lat, location_class) values",
-  DISTRICTS.map(
-    (d) => `  (${q(d.slug)}, ${q(d.name)}, ${q(d.borough)}, ${d.center[0]}, ${d.center[1]}, ${q(d.locationClass)})`,
-  ).join(",\n") + "\non conflict (slug) do nothing;",
-  "",
-  "insert into contacts (id, name, role, email, phone) values",
-  CONTACTS.map((c) => `  (${uuid(`contact-${c.id}`)}, ${q(c.name)}, ${q(c.role)}, ${q(c.email)}, ${q(c.phone)})`).join(
-    ",\n",
-  ) + "\non conflict (id) do nothing;",
-  "",
+/** Zusammenhängende Statement-Gruppen; ein Paket enthält immer ganze Gruppen */
+const blocks: string[] = [
+  "insert into districts (slug, name, market_area, center_lng, center_lat) values" +
+    NL +
+    districts
+      .map((d) => `  (${q(d.slug)}, ${q(d.name)}, ${q(d.marketArea)}, ${q(d.center?.[0] ?? null)}, ${q(d.center?.[1] ?? null)})`)
+      .join("," + NL) +
+    NL +
+    "on conflict (slug) do update set name = excluded.name, market_area = excluded.market_area, center_lng = excluded.center_lng, center_lat = excluded.center_lat;",
 ];
 
-for (const l of MOCK_LISTINGS) {
+const buildingsSeen = new Set<string>();
+for (const l of listings) {
   const b = l.building;
-  const propertyFeatures = l.features.filter((f) => !BUILDING_FEATURES.has(f) && !DERIVED.has(f));
-
-  lines.push(
-    `-- ${l.title}`,
-    `insert into buildings (id, name, street, house_number, postal_code, district_slug, location, location_class, year_built, year_renovated, floors, features) values (${uuid(
-      `building-${l.id}`,
-    )}, ${q(b.name)}, ${q(b.street)}, ${q(b.houseNumber)}, ${q(b.postalCode)}, ${q(b.districtSlug)}, ${point(b.lng, b.lat)}, ${q(
-      b.locationClass,
-    )}, ${q(b.yearBuilt)}, ${q(b.yearRenovated)}, ${q(b.floors)}, ${textArray(b.features)});`,
-    `insert into properties (id, building_id, contact_id, slug, reference_number, title, teaser, description, category, property_type, status, commission_free, features, published_at) values (${uuid(
-      `property-${l.id}`,
-    )}, ${uuid(`building-${l.id}`)}, ${uuid(`contact-${l.contact.id}`)}, ${q(l.slug)}, ${q(l.id.toUpperCase())}, ${q(
-      l.title,
-    )}, ${q(l.teaser)}, ${q(l.description)}, ${q(l.category)}, ${q(l.type)}, 'published', ${l.commissionFree}, ${textArray(
-      propertyFeatures,
-    )}, ${q(l.publishedAt)});`,
-    "insert into rental_units (id, property_id, label, floor, area_sqm, rent_per_sqm, service_charge_per_sqm, available_from, rooms, divisible, sort_order) values",
-    l.units
-      .map(
-        (u, i) =>
-          `  (${uuid(`unit-${u.id}`)}, ${uuid(`property-${l.id}`)}, ${q(u.label)}, ${u.floor}, ${u.areaSqm}, ${q(
-            u.rentPerSqm,
-          )}, ${q(u.serviceChargePerSqm)}, ${q(u.availableFrom)}, ${q(u.rooms)}, ${u.divisible}, ${i})`,
-      )
-      .join(",\n") + ";",
-    "insert into property_images (id, property_id, url, alt, sort_order) values",
-    l.images
-      .map((img, i) => `  (${uuid(`image-${img.id}`)}, ${uuid(`property-${l.id}`)}, ${q(img.url)}, ${q(img.alt)}, ${i})`)
-      .join(",\n") + ";",
-    "",
+  if (buildingsSeen.has(b.id)) continue;
+  buildingsSeen.add(b.id);
+  blocks.push(
+    `insert into buildings (id, street, house_number, postal_code, city, district_slug, market_area, location, source, external_id) values (${uuid(
+      `building-${b.id}`,
+    )}, ${q(b.street)}, ${q(b.houseNumber)}, ${q(b.postalCode)}, ${q(b.city)}, ${q(l.districtSlug)}, ${q(l.marketArea)}, ${point(
+      l.lng,
+      l.lat,
+    )}, 'filemaker', ${q(b.id)}) on conflict (id) do nothing;`,
   );
 }
 
-lines.push("commit;", "");
+for (const l of listings) {
+  const ref = l.referenceNumber;
+  const property = uuid(`property-${ref}`);
+  const statements = [
+    `-- ${ref}: ${l.title}`,
+    `insert into properties (id, building_id, reference_number, slug, title, teaser, description, category, categories, property_type, status, price_type, price_note, commission_free, commission_months, commission_note, features, area_range_min_sqm, area_range_max_sqm, expose_pdf_url, featured_rank, source, external_id) values (${property}, ${uuid(
+      `building-${l.building.id}`,
+    )}, ${q(ref)}, ${q(l.slug)}, ${q(l.title)}, ${q(l.teaser)}, ${q(l.description)}, ${q(l.category)}, ${enumArray(
+      l.categories,
+      "property_category",
+    )}, ${q(l.type)}, 'published', ${q(l.priceType)}, ${q(l.priceNote)}, ${l.commissionFree}, ${q(l.commissionMonths)}, ${q(
+      l.commissionNote,
+    )}, ${textArray(l.features.filter((f) => f !== "provisionsfrei"))}, ${q(l.areaRangeMin)}, ${q(l.areaRangeMax)}, ${q(
+      l.exposeUrl,
+    )}, ${q(l.featuredRank)}, 'filemaker', ${q(ref)}) on conflict (id) do nothing;`,
+    ...l.units.map(
+      (u, i) =>
+        `insert into rental_units (id, property_id, label, area_sqm, rent_per_sqm, rent_total_monthly, source, external_id) values (${uuid(
+          `unit-${ref}-${i + 1}`,
+        )}, ${property}, ${q(u.label)}, ${u.areaSqm || 1}, ${q(u.rentPerSqm)}, ${q(u.rentTotalMonthly)}, 'filemaker', ${q(
+          `${ref}-${i + 1}`,
+        )}) on conflict (id) do nothing;`,
+    ),
+  ];
+  if (l.images.length) {
+    statements.push(
+      "insert into property_images (id, property_id, url, alt, sort_order, source, external_id) values" +
+        NL +
+        l.images
+          .map(
+            (img, i) =>
+              `  (${uuid(`image-${ref}-${i + 1}`)}, ${property}, ${q(img.url)}, ${q(img.alt)}, ${i}, 'filemaker', ${q(
+                `${ref}-${String(i + 1).padStart(2, "0")}`,
+              )})`,
+          )
+          .join("," + NL) +
+        NL +
+        "on conflict (id) do nothing;",
+    );
+  }
+  blocks.push(statements.join(NL));
+}
 
-const target = join(process.cwd(), "supabase", "seed.sql");
-writeFileSync(target, lines.join("\n"));
-console.log(`Seed mit ${MOCK_LISTINGS.length} Immobilien geschrieben: ${target}`);
+const seedDir = join(process.cwd(), "supabase", "seed");
+rmSync(seedDir, { recursive: true, force: true });
+rmSync(join(process.cwd(), "supabase", "seed.sql"), { force: true });
+mkdirSync(seedDir, { recursive: true });
+
+const header =
+  "-- Automatisch generiert durch scripts/generate-seed.ts aus dem Objektbestand von buerohamburg.de." +
+  NL +
+  "-- Nicht manuell bearbeiten – stattdessen `npm run scrape` und `npm run db:seed:generate` ausführen.";
+const chunks: string[][] = [[]];
+let size = 0;
+for (const block of blocks) {
+  const bytes = Buffer.byteLength(block);
+  if (size + bytes > SEED_CHUNK_BYTES && chunks[chunks.length - 1].length) {
+    chunks.push([]);
+    size = 0;
+  }
+  chunks[chunks.length - 1].push(block);
+  size += bytes;
+}
+chunks.forEach((chunk, i) => {
+  const file = join(seedDir, `${String(i + 1).padStart(3, "0")}.sql`);
+  writeFileSync(file, [header, "begin;", ...chunk, "commit;", ""].join(NL + NL));
+});
+
+// ---------------------------------------------------------------------------
+// Mock-Fixture: alle seltenen Kategorien, alle hervorgehobenen Objekte, je Stadtteil
+// mindestens ein Objekt, aufgefüllt mit einer gleichmäßigen Stichprobe
+// ---------------------------------------------------------------------------
+const picked = new Map<string, Listing>();
+const pick = (l: Listing) => picked.size < FIXTURE_SIZE && picked.set(l.id, l);
+listings.filter((l) => l.category !== "buero-praxis" || l.categories.length > 1).forEach(pick);
+listings.filter((l) => l.featuredRank != null).forEach(pick);
+for (const d of districts) {
+  const first = listings.find((l) => l.districtSlug === d.slug && l.lat != null);
+  if (first) pick(first);
+}
+const step = Math.max(1, Math.floor(listings.length / FIXTURE_SIZE));
+for (let i = 0; picked.size < FIXTURE_SIZE && i < listings.length; i += step) pick(listings[i]);
+
+const fixtureListings = [...picked.values()];
+const usedDistricts = new Set(fixtureListings.map((l) => l.districtSlug));
+const fixtureFile = join(process.cwd(), "src", "lib", "data", "mock", "fixture.json");
+writeFileSync(
+  fixtureFile,
+  JSON.stringify({ districts: districts.filter((d) => usedDistricts.has(d.slug)), listings: fixtureListings }),
+);
+
+console.log(`seed/:        ${chunks.length} Pakete, ${listings.length} Objekte, ${buildingsSeen.size} Gebäude, ${districts.length} Stadtteile`);
+console.log(`fixture.json: ${fixtureListings.length} Objekte für den Mock-Modus`);

@@ -4,13 +4,13 @@ import { Check, Link2, Search, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { categoryLabel, FEATURES, PROPERTY_TYPE_KEYS, PROPERTY_TYPES, QUICK_FEATURES } from "@/lib/constants";
+import { categoryLabel, FEATURES, QUICK_FEATURES } from "@/lib/constants";
 import { countActiveFilters } from "@/lib/search/params";
 import { cn } from "@/lib/utils";
 
 import { DistrictPicker } from "./district-picker";
-import { AreaRange, CategorySelect, FieldLabel, LocationSelect, RentRange } from "./filter-fields";
-import { FilterSheet } from "./filter-sheet";
+import { AreaRange, CategorySelect, FieldLabel, MarketAreaSelect, RentRange } from "./filter-fields";
+import { FilterDialog } from "./filter-dialog";
 import { MobileSearchSheet } from "./mobile-search-sheet";
 import { toggleValue, useSearch } from "./search-context";
 
@@ -41,7 +41,7 @@ export function SearchBar({ total }: { total: number }) {
         </div>
         <div>
           <FieldLabel>Lage</FieldLabel>
-          <LocationSelect />
+          <MarketAreaSelect />
         </div>
         <div>
           <FieldLabel>Mietfläche (m²)</FieldLabel>
@@ -92,24 +92,11 @@ export function SearchBar({ total }: { total: number }) {
 
 function FilterChips({ total }: { total: number }) {
   const { filters, update } = useSearch();
-  const types = filters.category
-    ? PROPERTY_TYPE_KEYS.filter((t) => PROPERTY_TYPES[t].category === filters.category)
-    : PROPERTY_TYPE_KEYS;
-  const moreCount = filters.features.filter((f) => !QUICK_FEATURES.includes(f)).length + (filters.locationClass ? 1 : 0);
+  const moreCount = filters.features.filter((f) => !QUICK_FEATURES.includes(f)).length;
 
   return (
     <div className="mt-2.5 flex items-center gap-3">
       <div className="-mx-3 flex flex-1 gap-1.5 overflow-x-auto px-3 pb-0.5 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
-        {types.map((type) => (
-          <Chip
-            key={type}
-            active={filters.types.includes(type)}
-            onClick={() => update({ types: toggleValue(filters.types, type) })}
-          >
-            {PROPERTY_TYPES[type].plural}
-          </Chip>
-        ))}
-        <span className="hidden w-px shrink-0 self-stretch bg-border sm:block" aria-hidden />
         {QUICK_FEATURES.map((feature) => (
           <Chip
             key={feature}
@@ -121,7 +108,7 @@ function FilterChips({ total }: { total: number }) {
         ))}
       </div>
       <div className="hidden shrink-0 items-center gap-3 lg:flex">
-        <FilterSheet
+        <FilterDialog
           total={total}
           trigger={
             <button

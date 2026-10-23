@@ -20,63 +20,51 @@ export type Database = {
           created_at: string
           district_slug: string
           external_id: string | null
-          external_modified_at: string | null
           features: string[]
-          floors: number | null
           house_number: string
           id: string
           location: unknown
-          location_class: Database["public"]["Enums"]["location_class"]
+          market_area: Database["public"]["Enums"]["market_area"]
           name: string | null
           postal_code: string
           source: Database["public"]["Enums"]["record_source"]
           street: string
           synced_at: string | null
           updated_at: string
-          year_built: number | null
-          year_renovated: number | null
         }
         Insert: {
           city?: string
           created_at?: string
           district_slug: string
           external_id?: string | null
-          external_modified_at?: string | null
           features?: string[]
-          floors?: number | null
           house_number?: string
           id?: string
-          location: unknown
-          location_class: Database["public"]["Enums"]["location_class"]
+          location?: unknown
+          market_area: Database["public"]["Enums"]["market_area"]
           name?: string | null
           postal_code: string
           source?: Database["public"]["Enums"]["record_source"]
           street: string
           synced_at?: string | null
           updated_at?: string
-          year_built?: number | null
-          year_renovated?: number | null
         }
         Update: {
           city?: string
           created_at?: string
           district_slug?: string
           external_id?: string | null
-          external_modified_at?: string | null
           features?: string[]
-          floors?: number | null
           house_number?: string
           id?: string
           location?: unknown
-          location_class?: Database["public"]["Enums"]["location_class"]
+          market_area?: Database["public"]["Enums"]["market_area"]
           name?: string | null
           postal_code?: string
           source?: Database["public"]["Enums"]["record_source"]
           street?: string
           synced_at?: string | null
           updated_at?: string
-          year_built?: number | null
-          year_renovated?: number | null
         }
         Relationships: [
           {
@@ -129,26 +117,23 @@ export type Database = {
       }
       districts: {
         Row: {
-          borough: string
-          center_lat: number
-          center_lng: number
-          location_class: Database["public"]["Enums"]["location_class"]
+          center_lat: number | null
+          center_lng: number | null
+          market_area: Database["public"]["Enums"]["market_area"]
           name: string
           slug: string
         }
         Insert: {
-          borough: string
-          center_lat: number
-          center_lng: number
-          location_class: Database["public"]["Enums"]["location_class"]
+          center_lat?: number | null
+          center_lng?: number | null
+          market_area: Database["public"]["Enums"]["market_area"]
           name: string
           slug: string
         }
         Update: {
-          borough?: string
-          center_lat?: number
-          center_lng?: number
-          location_class?: Database["public"]["Enums"]["location_class"]
+          center_lat?: number | null
+          center_lng?: number | null
+          market_area?: Database["public"]["Enums"]["market_area"]
           name?: string
           slug?: string
         }
@@ -210,19 +195,27 @@ export type Database = {
       }
       properties: {
         Row: {
+          area_range_max_sqm: number | null
+          area_range_min_sqm: number | null
           building_id: string
+          categories: Database["public"]["Enums"]["property_category"][]
           category: Database["public"]["Enums"]["property_category"]
           commission_free: boolean
+          commission_months: number | null
+          commission_note: string | null
           contact_id: string | null
           created_at: string
           description: string
+          expose_pdf_url: string | null
           external_id: string | null
-          external_modified_at: string | null
+          featured_rank: number | null
           features: string[]
           id: string
+          price_note: string | null
+          price_type: Database["public"]["Enums"]["price_type"]
           property_type: Database["public"]["Enums"]["property_type"]
           published_at: string | null
-          reference_number: string | null
+          reference_number: string
           slug: string
           source: Database["public"]["Enums"]["record_source"]
           status: Database["public"]["Enums"]["property_status"]
@@ -232,19 +225,27 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          area_range_max_sqm?: number | null
+          area_range_min_sqm?: number | null
           building_id: string
+          categories: Database["public"]["Enums"]["property_category"][]
           category: Database["public"]["Enums"]["property_category"]
           commission_free?: boolean
+          commission_months?: number | null
+          commission_note?: string | null
           contact_id?: string | null
           created_at?: string
           description?: string
+          expose_pdf_url?: string | null
           external_id?: string | null
-          external_modified_at?: string | null
+          featured_rank?: number | null
           features?: string[]
           id?: string
+          price_note?: string | null
+          price_type?: Database["public"]["Enums"]["price_type"]
           property_type: Database["public"]["Enums"]["property_type"]
           published_at?: string | null
-          reference_number?: string | null
+          reference_number: string
           slug: string
           source?: Database["public"]["Enums"]["record_source"]
           status?: Database["public"]["Enums"]["property_status"]
@@ -254,19 +255,27 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          area_range_max_sqm?: number | null
+          area_range_min_sqm?: number | null
           building_id?: string
+          categories?: Database["public"]["Enums"]["property_category"][]
           category?: Database["public"]["Enums"]["property_category"]
           commission_free?: boolean
+          commission_months?: number | null
+          commission_note?: string | null
           contact_id?: string | null
           created_at?: string
           description?: string
+          expose_pdf_url?: string | null
           external_id?: string | null
-          external_modified_at?: string | null
+          featured_rank?: number | null
           features?: string[]
           id?: string
+          price_note?: string | null
+          price_type?: Database["public"]["Enums"]["price_type"]
           property_type?: Database["public"]["Enums"]["property_type"]
           published_at?: string | null
-          reference_number?: string | null
+          reference_number?: string
           slug?: string
           source?: Database["public"]["Enums"]["record_source"]
           status?: Database["public"]["Enums"]["property_status"]
@@ -356,13 +365,12 @@ export type Database = {
           created_at: string
           divisible: boolean
           external_id: string | null
-          external_modified_at: string | null
-          floor: number
+          floor: number | null
           id: string
           label: string
-          min_divisible_area_sqm: number | null
           property_id: string
           rent_per_sqm: number | null
+          rent_total_monthly: number | null
           rooms: number | null
           service_charge_per_sqm: number | null
           sort_order: number
@@ -376,13 +384,12 @@ export type Database = {
           created_at?: string
           divisible?: boolean
           external_id?: string | null
-          external_modified_at?: string | null
-          floor?: number
+          floor?: number | null
           id?: string
-          label: string
-          min_divisible_area_sqm?: number | null
+          label?: string
           property_id: string
           rent_per_sqm?: number | null
+          rent_total_monthly?: number | null
           rooms?: number | null
           service_charge_per_sqm?: number | null
           sort_order?: number
@@ -396,13 +403,12 @@ export type Database = {
           created_at?: string
           divisible?: boolean
           external_id?: string | null
-          external_modified_at?: string | null
-          floor?: number
+          floor?: number | null
           id?: string
           label?: string
-          min_divisible_area_sqm?: number | null
           property_id?: string
           rent_per_sqm?: number | null
+          rent_total_monthly?: number | null
           rooms?: number | null
           service_charge_per_sqm?: number | null
           sort_order?: number
@@ -465,35 +471,42 @@ export type Database = {
       property_listings: {
         Row: {
           address: string | null
-          area_max: number | null
-          area_min: number | null
-          available_from: string | null
+          area: number | null
+          area_range_max: number | null
+          area_range_min: number | null
+          area_search_max: number | null
+          area_search_min: number | null
           building: Json | null
+          categories: Database["public"]["Enums"]["property_category"][] | null
           category: Database["public"]["Enums"]["property_category"] | null
           commission_free: boolean | null
+          commission_months: number | null
+          commission_note: string | null
           contact: Json | null
           description: string | null
           district_name: string | null
           district_slug: string | null
+          expose_pdf_url: string | null
+          featured_rank: number | null
           features: string[] | null
-          floor_max: number | null
-          floor_min: number | null
           id: string | null
           images: Json | null
           lat: number | null
           lng: number | null
           location: unknown
-          location_class: Database["public"]["Enums"]["location_class"] | null
+          market_area: Database["public"]["Enums"]["market_area"] | null
+          price_note: string | null
+          price_type: Database["public"]["Enums"]["price_type"] | null
           property_type: Database["public"]["Enums"]["property_type"] | null
           published_at: string | null
-          rent_max: number | null
-          rent_min: number | null
-          rooms: number | null
+          reference_number: string | null
+          reference_sort: number | null
+          rent_per_sqm: number | null
+          rent_total_monthly: number | null
           slug: string | null
           status: Database["public"]["Enums"]["property_status"] | null
           teaser: string | null
           title: string | null
-          unit_count: number | null
           units: Json | null
         }
         Relationships: [
@@ -516,42 +529,48 @@ export type Database = {
           p_category?: Database["public"]["Enums"]["property_category"]
           p_districts?: string[]
           p_features?: string[]
-          p_location_class?: Database["public"]["Enums"]["location_class"]
+          p_market_area?: Database["public"]["Enums"]["market_area"]
           p_rent_max?: number
           p_rent_min?: number
-          p_types?: Database["public"]["Enums"]["property_type"][]
         }
         Returns: {
           address: string | null
-          area_max: number | null
-          area_min: number | null
-          available_from: string | null
+          area: number | null
+          area_range_max: number | null
+          area_range_min: number | null
+          area_search_max: number | null
+          area_search_min: number | null
           building: Json | null
+          categories: Database["public"]["Enums"]["property_category"][] | null
           category: Database["public"]["Enums"]["property_category"] | null
           commission_free: boolean | null
+          commission_months: number | null
+          commission_note: string | null
           contact: Json | null
           description: string | null
           district_name: string | null
           district_slug: string | null
+          expose_pdf_url: string | null
+          featured_rank: number | null
           features: string[] | null
-          floor_max: number | null
-          floor_min: number | null
           id: string | null
           images: Json | null
           lat: number | null
           lng: number | null
           location: unknown
-          location_class: Database["public"]["Enums"]["location_class"] | null
+          market_area: Database["public"]["Enums"]["market_area"] | null
+          price_note: string | null
+          price_type: Database["public"]["Enums"]["price_type"] | null
           property_type: Database["public"]["Enums"]["property_type"] | null
           published_at: string | null
-          rent_max: number | null
-          rent_min: number | null
-          rooms: number | null
+          reference_number: string | null
+          reference_sort: number | null
+          rent_per_sqm: number | null
+          rent_total_monthly: number | null
           slug: string | null
           status: Database["public"]["Enums"]["property_status"] | null
           teaser: string | null
           title: string | null
-          unit_count: number | null
           units: Json | null
         }[]
         SetofOptions: {
@@ -563,7 +582,15 @@ export type Database = {
       }
     }
     Enums: {
-      location_class: "city" | "citynah" | "buerozentrum" | "peripherie"
+      market_area:
+        | "hh-city"
+        | "hh-city-sued"
+        | "hh-alster"
+        | "hh-west"
+        | "hh-nord"
+        | "hh-ost"
+        | "hh-sued"
+      price_type: "qm" | "monat"
       property_category: "buero-praxis" | "laden-gastro" | "lager-logistik"
       property_status:
         | "draft"
@@ -571,7 +598,7 @@ export type Database = {
         | "reserved"
         | "rented"
         | "archived"
-      property_type: "buero" | "praxis" | "laden" | "gastro" | "lager"
+      property_type: "buero" | "laden" | "lager"
       record_source: "manual" | "filemaker"
     }
     CompositeTypes: {
@@ -700,10 +727,19 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      location_class: ["city", "citynah", "buerozentrum", "peripherie"],
+      market_area: [
+        "hh-city",
+        "hh-city-sued",
+        "hh-alster",
+        "hh-west",
+        "hh-nord",
+        "hh-ost",
+        "hh-sued",
+      ],
+      price_type: ["qm", "monat"],
       property_category: ["buero-praxis", "laden-gastro", "lager-logistik"],
       property_status: ["draft", "published", "reserved", "rented", "archived"],
-      property_type: ["buero", "praxis", "laden", "gastro", "lager"],
+      property_type: ["buero", "laden", "lager"],
       record_source: ["manual", "filemaker"],
     },
   },

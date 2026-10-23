@@ -2,9 +2,9 @@
 
 import { Building, Euro, MapPinned, Maximize } from "lucide-react";
 
+import { CategoryDot } from "@/components/listing/category-dot";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LOCATION_CLASSES, PROPERTY_CATEGORIES, PROPERTY_TYPES, type PropertyCategory } from "@/lib/constants";
-import type { LocationClass } from "@/lib/constants";
+import { MARKET_AREAS, PROPERTY_CATEGORIES, type MarketArea, type PropertyCategory } from "@/lib/constants";
 
 import { RangeField } from "./range-field";
 import { useSearch } from "./search-context";
@@ -19,12 +19,7 @@ export function CategorySelect() {
   return (
     <Select
       value={filters.category ?? ALL}
-      onValueChange={(value) => {
-        const category = value === ALL ? null : (value as PropertyCategory);
-        // Objekttypen außerhalb der neuen Kategorie verwerfen
-        const types = category ? filters.types.filter((t) => PROPERTY_TYPES[t].category === category) : filters.types;
-        update({ category, types });
-      }}
+      onValueChange={(value) => update({ category: value === ALL ? null : (value as PropertyCategory) })}
     >
       <SelectTrigger className={triggerClass} aria-label="Objektart">
         <span className="flex min-w-0 items-center gap-2">
@@ -36,7 +31,10 @@ export function CategorySelect() {
         <SelectItem value={ALL}>Alle Objektarten</SelectItem>
         {PROPERTY_CATEGORIES.map((c) => (
           <SelectItem key={c.value} value={c.value}>
-            {c.label}
+            <span className="flex items-center gap-2">
+              <CategoryDot category={c.value} />
+              {c.label}
+            </span>
           </SelectItem>
         ))}
       </SelectContent>
@@ -44,12 +42,12 @@ export function CategorySelect() {
   );
 }
 
-export function LocationSelect() {
+export function MarketAreaSelect() {
   const { filters, update } = useSearch();
   return (
     <Select
-      value={filters.locationClass ?? ALL}
-      onValueChange={(value) => update({ locationClass: value === ALL ? null : (value as LocationClass) })}
+      value={filters.marketArea ?? ALL}
+      onValueChange={(value) => update({ marketArea: value === ALL ? null : (value as MarketArea) })}
     >
       <SelectTrigger className={triggerClass} aria-label="Lage">
         <span className="flex min-w-0 items-center gap-2">
@@ -59,7 +57,7 @@ export function LocationSelect() {
       </SelectTrigger>
       <SelectContent position="popper">
         <SelectItem value={ALL}>Alle Lagen</SelectItem>
-        {LOCATION_CLASSES.map((l) => (
+        {MARKET_AREAS.map((l) => (
           <SelectItem key={l.value} value={l.value}>
             {l.label}
           </SelectItem>

@@ -33,12 +33,15 @@ export function ImageGallery({ images, title }: { images: PropertyImage[]; title
 
   const [main, ...rest] = images;
   const thumbs = rest.slice(0, 4);
+  // Raster an die Bildanzahl anpassen, damit keine leeren Felder entstehen
+  const thumbSpan = (i: number) =>
+    thumbs.length === 1 ? "md:col-span-2 md:row-span-2" : thumbs.length === 2 || (thumbs.length === 3 && i === 2) ? "md:col-span-2" : "";
 
   return (
     <>
       <div className="relative grid h-[260px] gap-2 overflow-hidden rounded-xl sm:h-[380px] md:grid-cols-4 md:grid-rows-2 lg:h-[460px]">
         <GalleryTile
-          className="md:col-span-2 md:row-span-2"
+          className={thumbs.length ? "md:col-span-2 md:row-span-2" : "md:col-span-4 md:row-span-2"}
           image={main}
           alt={main?.alt ?? title}
           onClick={() => show(0)}
@@ -48,7 +51,7 @@ export function ImageGallery({ images, title }: { images: PropertyImage[]; title
         {thumbs.map((image, i) => (
           <GalleryTile
             key={image.id}
-            className="hidden md:block"
+            className={cn("hidden md:block", thumbSpan(i))}
             image={image}
             alt={image.alt}
             onClick={() => show(i + 1)}
@@ -68,9 +71,10 @@ export function ImageGallery({ images, title }: { images: PropertyImage[]; title
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-[min(1200px,96vw)] gap-0 border-0 bg-black p-0 text-white sm:max-w-[min(1200px,96vw)]">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-[min(1200px,96vw)] gap-0 overflow-hidden border-0 bg-black p-0 text-white sm:max-w-[min(1200px,96vw)]">
           <DialogTitle className="sr-only">Bildergalerie: {title}</DialogTitle>
-          <div className="relative aspect-[3/2] w-full">
+          {/* Bildhöhe an das Fenster anpassen: höchstens 3:2 der Breite, aber immer Platz für Unterschrift und Vorschaubilder */}
+          <div className="relative h-[min(calc(100dvh-9.5rem),calc(min(1200px,96vw)*0.6667))] w-full">
             <ListingImage
               key={images[index]?.id}
               src={images[index]?.url}

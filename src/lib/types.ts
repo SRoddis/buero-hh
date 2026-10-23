@@ -1,10 +1,4 @@
-import type {
-  FeatureKey,
-  LocationClass,
-  PropertyCategory,
-  PropertyType,
-  SortKey,
-} from "@/lib/constants";
+import type { FeatureKey, MarketArea, PropertyCategory, PropertyType, SortKey } from "@/lib/constants";
 
 /**
  * Domänenmodell – spiegelt das Supabase-Schema (siehe supabase/migrations):
@@ -16,10 +10,8 @@ import type {
 export interface District {
   slug: string;
   name: string;
-  /** Bezirk, z. B. "Hamburg-Mitte" */
-  borough: string;
-  center: [lng: number, lat: number];
-  locationClass: LocationClass;
+  marketArea: MarketArea;
+  center: [lng: number, lat: number] | null;
 }
 
 export interface Building {
@@ -29,27 +21,20 @@ export interface Building {
   houseNumber: string;
   postalCode: string;
   city: string;
-  districtSlug: string;
-  districtName: string;
-  lat: number;
-  lng: number;
-  locationClass: LocationClass;
-  yearBuilt: number | null;
-  yearRenovated: number | null;
-  floors: number | null;
   features: FeatureKey[];
 }
 
 export interface RentalUnit {
   id: string;
   label: string;
-  /** 0 = Erdgeschoss, negative Werte = Untergeschoss */
-  floor: number;
+  floor: number | null;
   areaSqm: number;
   /** Nettokaltmiete in €/m²; null = Preis auf Anfrage */
   rentPerSqm: number | null;
+  /** Pauschalmiete pro Monat (bei Preisart „Monat“) */
+  rentTotalMonthly: number | null;
   serviceChargePerSqm: number | null;
-  /** ISO-Datum; null = sofort verfügbar */
+  /** ISO-Datum; null = keine Angabe */
   availableFrom: string | null;
   rooms: number | null;
   divisible: boolean;
@@ -70,42 +55,53 @@ export interface Contact {
   imageUrl: string | null;
 }
 
-/** Vollständige Immobilie für die Detailseite. */
-export interface Listing extends ListingSummary {
-  description: string;
-  building: Building;
-  units: RentalUnit[];
-  contact: Contact;
-}
-
 /** Kompakte Darstellung für Trefferliste, Merkliste und Karte. */
 export interface ListingSummary {
   id: string;
   slug: string;
+  /** Objektnummer aus FileMaker */
+  referenceNumber: string;
   title: string;
   teaser: string;
   category: PropertyCategory;
+  categories: PropertyCategory[];
   type: PropertyType;
   districtSlug: string;
   districtName: string;
+  marketArea: MarketArea;
   address: string;
-  lat: number;
-  lng: number;
-  locationClass: LocationClass;
-  areaMin: number;
-  areaMax: number;
-  /** null = Mietpreis auf Anfrage */
-  rentMin: number | null;
-  rentMax: number | null;
-  rooms: number | null;
-  floorMin: number;
-  floorMax: number;
-  unitCount: number;
-  availableFrom: string | null;
-  features: FeatureKey[];
+  /** null, wenn (noch) keine Koordinaten vorliegen */
+  lat: number | null;
+  lng: number | null;
+  /** angebotene Mietfläche in m² */
+  area: number;
+  /** weitere Flächen im Objekt („ab ca. … / bis ca. … qm“) */
+  areaRangeMin: number | null;
+  areaRangeMax: number | null;
+  /** Miete pro m²; null = auf Anfrage */
+  rentPerSqm: number | null;
+  /** Pauschalmiete pro Monat, falls so angeboten */
+  rentTotalMonthly: number | null;
+  priceType: "qm" | "monat";
+  /** z. B. „zzgl. NK u. MwSt.“ */
+  priceNote: string | null;
   commissionFree: boolean;
+  /** Courtage in Monatsmieten (bei courtagepflichtigen Objekten) */
+  commissionMonths: number | null;
+  features: FeatureKey[];
   images: PropertyImage[];
-  publishedAt: string;
+  /** Hervorhebung (1 = ganz oben), null = keine */
+  featuredRank: number | null;
+}
+
+/** Vollständige Immobilie für die Detailseite. */
+export interface Listing extends ListingSummary {
+  description: string;
+  commissionNote: string | null;
+  exposeUrl: string | null;
+  building: Building;
+  units: RentalUnit[];
+  contact: Contact;
 }
 
 export type MapMarker = Pick<
@@ -114,23 +110,21 @@ export type MapMarker = Pick<
   | "slug"
   | "title"
   | "category"
+  | "categories"
   | "type"
-  | "lat"
-  | "lng"
-  | "areaMin"
-  | "areaMax"
-  | "rentMin"
-  | "rooms"
+  | "area"
+  | "rentPerSqm"
+  | "rentTotalMonthly"
+  | "priceType"
   | "address"
   | "districtName"
   | "images"
->;
+> & { lat: number; lng: number };
 
 export interface SearchFilters {
   districts: string[];
   category: PropertyCategory | null;
-  types: PropertyType[];
-  locationClass: LocationClass | null;
+  marketArea: MarketArea | null;
   areaMin: number | null;
   areaMax: number | null;
   rentMin: number | null;

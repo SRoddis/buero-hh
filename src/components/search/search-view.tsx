@@ -48,8 +48,6 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
     else document.getElementById("ergebnisse")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const header = <ResultsHeader total={result.total} view={view} onViewChange={setView} />;
-
   return (
     // Desktop: App-Layout in Bildschirmhöhe (abzüglich Seitenheader h-16), damit die Karte immer
     // vollständig sichtbar ist und die Liste in ihrer eigenen Spalte scrollt
@@ -58,15 +56,18 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
         <SearchBar total={result.total} />
       </div>
 
+      {/* Kopfzeile in beiden Ansichten über die volle Breite – Bedienelemente bleiben immer oben rechts */}
+      <div className="shrink-0 px-4 pt-4 sm:px-6 lg:px-8">
+        <ResultsHeader total={result.total} view={view} onViewChange={setView} />
+      </div>
+
       <div
         id="ergebnisse"
         className={cn(
-          "grid flex-1 scroll-mt-2 gap-x-6 gap-y-4 pt-4 lg:min-h-0",
-          view === "liste" ? cn(GRID_COLUMNS[mapSize], "lg:grid-rows-[minmax(0,1fr)]") : "lg:grid-rows-[auto_minmax(0,1fr)]",
+          "grid flex-1 scroll-mt-2 gap-x-6 gap-y-4 pt-4 lg:min-h-0 lg:grid-rows-[minmax(0,1fr)]",
+          view === "liste" && GRID_COLUMNS[mapSize],
         )}
       >
-        {view === "karte" && <div className="hidden px-4 sm:px-6 lg:block lg:px-8">{header}</div>}
-
         <section
           ref={listRef}
           aria-label="Suchergebnisse"
@@ -77,8 +78,6 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
           )}
         >
           <div className="space-y-5">
-            {header}
-
             {result.items.length === 0 ? (
               <EmptyState hasBbox={filters.bbox !== null} onReset={reset} onClearBbox={() => update({ bbox: null })} />
             ) : (
@@ -113,7 +112,6 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
               : "block px-4 pb-24 sm:px-6 lg:min-h-0 lg:px-8 lg:pb-6",
           )}
         >
-          {view === "karte" && <div className="mb-4 lg:hidden">{header}</div>}
           <div
             className={cn(
               "relative overflow-hidden",
@@ -129,6 +127,7 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
               bbox={filters.bbox}
               onBboxChange={(bbox) => update({ bbox })}
               fitKey={fitKey}
+              colorCategory={filters.category}
             />
             {view === "liste" && <MapSizeControls size={mapSize} onChange={setMapSize} />}
           </div>

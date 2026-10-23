@@ -1,6 +1,6 @@
 import type { ExpressionSpecification } from "maplibre-gl";
 
-import { CATEGORY_COLORS } from "@/lib/constants";
+import { CATEGORY_COLORS, type PropertyCategory } from "@/lib/constants";
 import type { MapMarker } from "@/lib/types";
 
 /** Kostenloser Vektor-Kartenstil ohne API-Key; per Umgebungsvariable austauschbar (z. B. MapTiler). */
@@ -18,13 +18,27 @@ export const CATEGORY_COLOR_EXPRESSION: ExpressionSpecification = [
   BRAND,
 ] as unknown as ExpressionSpecification;
 
-export function toFeatureCollection(markers: MapMarker[]): GeoJSON.FeatureCollection<GeoJSON.Point> {
+/**
+ * Angezeigte Objektart (Farbe von Punkt und Preis-Pin): bei aktivem Objektart-Filter dessen Farbe –
+ * gemischte Objekte wie „Büro/Praxis + Halle/Lager“ erscheinen dann z. B. gold –, sonst die Hauptobjektart.
+ */
+export function displayCategory(marker: MapMarker, colorCategory: PropertyCategory | null): PropertyCategory {
+  return colorCategory && marker.categories.includes(colorCategory) ? colorCategory : marker.category;
+}
+
+export function toFeatureCollection(
+  markers: MapMarker[],
+  colorCategory: PropertyCategory | null = null,
+): GeoJSON.FeatureCollection<GeoJSON.Point> {
   return {
     type: "FeatureCollection",
     features: markers.map((m) => ({
       type: "Feature",
       geometry: { type: "Point", coordinates: [m.lng, m.lat] },
-      properties: { id: m.id, category: m.category },
+      properties: {
+        id: m.id,
+        category: displayCategory(m, colorCategory),
+      },
     })),
   };
 }

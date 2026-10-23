@@ -22,7 +22,7 @@ export function UnitsTable({ units }: { units: RentalUnit[] }) {
                 {unit.label}
                 {unit.divisible && <span className="ml-2 text-xs font-normal text-muted-foreground">teilbar</span>}
               </td>
-              <td className="px-4 py-3">{formatFloor(unit.floor)}</td>
+              <td className="px-4 py-3">{unit.floor != null ? formatFloor(unit.floor) : "–"}</td>
               <td className="px-4 py-3 text-right tabular-nums">{formatArea(unit.areaSqm)}</td>
               <td className="px-4 py-3 text-right font-semibold tabular-nums">
                 {unit.rentPerSqm != null ? formatRent(unit.rentPerSqm) : "auf Anfrage"}

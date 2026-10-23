@@ -32,25 +32,30 @@ export function ResultsHeader({
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-      <h1 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-xl 2xl:text-2xl" aria-live="polite">
+      <h1 className="text-xl font-bold tracking-tight sm:text-2xl" aria-live="polite">
         <span className={cn("transition-opacity", isPending && "opacity-50")}>{formatNumber(total)}</span>{" "}
         {total === 1 ? "Immobilie" : "Immobilien"} {where}
       </h1>
 
       <div className="flex items-center gap-2">
-        <span className="hidden text-sm text-muted-foreground sm:inline lg:hidden 2xl:inline">Sortieren nach</span>
-        <Select value={filters.sort} onValueChange={(sort) => update({ sort: sort as SortKey })}>
-          <SelectTrigger className="h-9! min-w-40 bg-white" aria-label="Sortierung">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="popper" align="end">
-            {SORT_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>
-                {o.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* In der Kartenansicht spielt die Reihenfolge keine Rolle */}
+        {view === "liste" && (
+          <>
+            <span className="hidden text-sm text-muted-foreground sm:inline">Sortieren nach</span>
+            <Select value={filters.sort} onValueChange={(sort) => update({ sort: sort as SortKey })}>
+              <SelectTrigger className="h-9! min-w-40 bg-white" aria-label="Sortierung">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent position="popper" align="end">
+                {SORT_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
 
         <div className="hidden rounded-lg border bg-white p-0.5 lg:flex" role="group" aria-label="Ansicht">
           <ViewButton active={view === "liste"} onClick={() => onViewChange("liste")} icon={List}>

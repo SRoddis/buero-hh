@@ -1,26 +1,23 @@
 import {
   FEATURE_KEYS,
-  LOCATION_CLASSES,
+  MARKET_AREAS,
   PROPERTY_CATEGORIES,
-  PROPERTY_TYPE_KEYS,
   SORT_OPTIONS,
   type FeatureKey,
-  type LocationClass,
+  type MarketArea,
   type PropertyCategory,
-  type PropertyType,
   type SortKey,
 } from "@/lib/constants";
 import type { SearchFilters } from "@/lib/types";
 
 /**
  * Abbildung der Suchfilter auf sprechende, deutschsprachige URL-Parameter, z. B.
- * /immobilien?stadtteil=hafencity,altstadt&typ=buero&flaeche_von=200&ausstattung=provisionsfrei
+ * /immobilien?stadtteil=hafencity,altstadt&lage=hh-city&flaeche_von=200&ausstattung=provisionsfrei
  */
 export const PARAM_KEYS = {
   districts: "stadtteil",
   category: "objektart",
-  types: "typ",
-  locationClass: "lage",
+  marketArea: "lage",
   areaMin: "flaeche_von",
   areaMax: "flaeche_bis",
   rentMin: "miete_von",
@@ -34,8 +31,7 @@ export const PARAM_KEYS = {
 export const DEFAULT_FILTERS: SearchFilters = {
   districts: [],
   category: null,
-  types: [],
-  locationClass: null,
+  marketArea: null,
   areaMin: null,
   areaMax: null,
   rentMin: null,
@@ -85,12 +81,9 @@ export function parseSearchParams(params: RawParams): SearchFilters {
   return {
     districts: list(read(params, PARAM_KEYS.districts)),
     category,
-    types: list(read(params, PARAM_KEYS.types)).filter((t): t is PropertyType =>
-      (PROPERTY_TYPE_KEYS as string[]).includes(t),
-    ),
-    locationClass: oneOf<LocationClass>(
-      read(params, PARAM_KEYS.locationClass),
-      LOCATION_CLASSES.map((l) => l.value),
+    marketArea: oneOf<MarketArea>(
+      read(params, PARAM_KEYS.marketArea),
+      MARKET_AREAS.map((l) => l.value),
     ),
     areaMin: positiveNumber(read(params, PARAM_KEYS.areaMin)),
     areaMax: positiveNumber(read(params, PARAM_KEYS.areaMax)),
@@ -114,8 +107,7 @@ export function serializeFilters(filters: SearchFilters): URLSearchParams {
 
   set(PARAM_KEYS.districts, filters.districts.join(","));
   set(PARAM_KEYS.category, filters.category);
-  set(PARAM_KEYS.types, filters.types.join(","));
-  set(PARAM_KEYS.locationClass, filters.locationClass);
+  set(PARAM_KEYS.marketArea, filters.marketArea);
   set(PARAM_KEYS.areaMin, filters.areaMin);
   set(PARAM_KEYS.areaMax, filters.areaMax);
   set(PARAM_KEYS.rentMin, filters.rentMin);
@@ -138,8 +130,7 @@ export function countActiveFilters(filters: SearchFilters) {
   return (
     filters.districts.length +
     (filters.category ? 1 : 0) +
-    filters.types.length +
-    (filters.locationClass ? 1 : 0) +
+    (filters.marketArea ? 1 : 0) +
     (filters.areaMin != null || filters.areaMax != null ? 1 : 0) +
     (filters.rentMin != null || filters.rentMax != null ? 1 : 0) +
     filters.features.length
@@ -151,8 +142,7 @@ export function contentFilterKey(f: SearchFilters) {
   return JSON.stringify([
     f.districts,
     f.category,
-    f.types,
-    f.locationClass,
+    f.marketArea,
     f.areaMin,
     f.areaMax,
     f.rentMin,

@@ -7,19 +7,20 @@ import type { ListingSummary, MapMarker, SearchFilters, SearchResult } from "@/l
  */
 export function matchesFilters(listing: ListingSummary, f: SearchFilters): boolean {
   if (f.districts.length && !f.districts.includes(listing.districtSlug)) return false;
-  if (f.category && listing.category !== f.category) return false;
-  if (f.types.length && !f.types.includes(listing.type)) return false;
-  if (f.locationClass && listing.locationClass !== f.locationClass) return false;
+  if (f.category && !listing.categories.includes(f.category)) return false;
+  if (f.marketArea && listing.marketArea !== f.marketArea) return false;
 
-  // Flächen: Überschneidung des gesuchten Bereichs mit der Spanne der Mietflächen
-  if (f.areaMin != null && listing.areaMax < f.areaMin) return false;
-  if (f.areaMax != null && listing.areaMin > f.areaMax) return false;
+  // Flächen: angebotene Fläche plus weitere Flächen im Objekt müssen den gesuchten Bereich berühren
+  const searchMin = Math.min(listing.area, listing.areaRangeMin ?? listing.area);
+  const searchMax = Math.max(listing.area, listing.areaRangeMax ?? listing.area);
+  if (f.areaMin != null && searchMax < f.areaMin) return false;
+  if (f.areaMax != null && searchMin > f.areaMax) return false;
 
-  // Miete: Objekte "auf Anfrage" werden bei gesetztem Preisfilter ausgeblendet
+  // Miete pro m²: Objekte „auf Anfrage“ werden bei gesetztem Preisfilter ausgeblendet
   if (f.rentMin != null || f.rentMax != null) {
-    if (listing.rentMin == null) return false;
-    if (f.rentMin != null && (listing.rentMax ?? listing.rentMin) < f.rentMin) return false;
-    if (f.rentMax != null && listing.rentMin > f.rentMax) return false;
+    if (listing.rentPerSqm == null) return false;
+    if (f.rentMin != null && listing.rentPerSqm < f.rentMin) return false;
+    if (f.rentMax != null && listing.rentPerSqm > f.rentMax) return false;
   }
 
   if (f.features.length && !f.features.every((feature) => listing.features.includes(feature))) {
@@ -27,6 +28,7 @@ export function matchesFilters(listing: ListingSummary, f: SearchFilters): boole
   }
 
   if (f.bbox) {
+    if (listing.lat == null || listing.lng == null) return false;
     const [w, s, e, n] = f.bbox;
     if (listing.lng < w || listing.lng > e || listing.lat < s || listing.lat > n) return false;
   }
@@ -34,44 +36,46 @@ export function matchesFilters(listing: ListingSummary, f: SearchFilters): boole
   return true;
 }
 
+/** Objektnummer als Zahl – höhere Nummern sind neuere Objekte */
+const referenceSort = (l: ListingSummary) => Number(l.referenceNumber.replace(/\D/g, "")) || 0;
+
 export function sortListings(listings: ListingSummary[], sort: SearchFilters["sort"]) {
   const sorted = [...listings];
-  const rent = (l: ListingSummary) => l.rentMin ?? Number.POSITIVE_INFINITY;
+  const rent = (l: ListingSummary) => l.rentPerSqm ?? Number.POSITIVE_INFINITY;
   switch (sort) {
     case "neueste":
-      return sorted.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
+      return sorted.sort((a, b) => referenceSort(b) - referenceSort(a));
     case "miete-asc":
       return sorted.sort((a, b) => rent(a) - rent(b));
     case "miete-desc":
-      return sorted.sort((a, b) => (b.rentMin ?? -1) - (a.rentMin ?? -1));
+      return sorted.sort((a, b) => (b.rentPerSqm ?? -1) - (a.rentPerSqm ?? -1));
     case "flaeche-asc":
-      return sorted.sort((a, b) => a.areaMin - b.areaMin);
+      return sorted.sort((a, b) => a.area - b.area);
     case "flaeche-desc":
-      return sorted.sort((a, b) => b.areaMax - a.areaMax);
+      return sorted.sort((a, b) => b.area - a.area);
     default:
-      // Relevanz: Objekte mit Bildern, Preisangabe und neuerem Datum zuerst
-      return sorted.sort((a, b) => relevance(b) - relevance(a));
+      // Relevanz: hervorgehobene Objekte zuerst, danach die neuesten
+      return sorted.sort(
+        (a, b) => (a.featuredRank ?? 99) - (b.featuredRank ?? 99) || referenceSort(b) - referenceSort(a),
+      );
   }
 }
 
-function relevance(l: ListingSummary) {
-  const ageDays = (Date.now() - new Date(l.publishedAt).getTime()) / 86_400_000;
-  return (l.rentMin != null ? 2 : 0) + Math.min(l.images.length, 4) * 0.5 + Math.max(0, 30 - ageDays) / 10;
-}
-
-export function toMarker(l: ListingSummary): MapMarker {
+export function toMarker(l: ListingSummary): MapMarker | null {
+  if (l.lat == null || l.lng == null) return null;
   return {
     id: l.id,
     slug: l.slug,
     title: l.title,
     category: l.category,
+    categories: l.categories,
     type: l.type,
     lat: l.lat,
     lng: l.lng,
-    areaMin: l.areaMin,
-    areaMax: l.areaMax,
-    rentMin: l.rentMin,
-    rooms: l.rooms,
+    area: l.area,
+    rentPerSqm: l.rentPerSqm,
+    rentTotalMonthly: l.rentTotalMonthly,
+    priceType: l.priceType,
     address: l.address,
     districtName: l.districtName,
     images: l.images.slice(0, 5),
@@ -90,6 +94,6 @@ export function searchInMemory(all: ListingSummary[], filters: SearchFilters): S
     total: matches.length,
     page,
     pageCount,
-    markers: matches.map(toMarker),
+    markers: matches.map(toMarker).filter((m): m is MapMarker => m !== null),
   };
 }

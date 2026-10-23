@@ -15,6 +15,8 @@ interface ImageCarouselProps {
   priority?: boolean;
   /** Overlays wie Badges oder Merklisten-Button */
   children?: React.ReactNode;
+  /** Maximale Anzahl durchblätterbarer Bilder */
+  maxImages?: number;
   className?: string;
 }
 
@@ -22,9 +24,17 @@ interface ImageCarouselProps {
  * Bildwechsler für Karten in Liste und Kartenpopup.
  * Pfeile erscheinen beim Hover über das umgebende Element mit der Klasse `group`.
  */
-export function ImageCarousel({ images, alt, sizes, priority, children, className }: ImageCarouselProps) {
+export function ImageCarousel({
+  images,
+  alt,
+  sizes,
+  priority,
+  children,
+  maxImages = 5,
+  className,
+}: ImageCarouselProps) {
   const [index, setIndex] = useState(0);
-  const visible = images.slice(0, 5);
+  const visible = images.slice(0, maxImages);
   const image = visible[index];
 
   const step = (delta: number) => (e: React.MouseEvent) => {

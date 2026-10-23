@@ -14,7 +14,8 @@
     "db:seed:generate": "tsx scripts/generate-seed.ts",
     "db:push": "supabase db push --linked",
     "db:types": "supabase gen types typescript --linked --schema public > src/lib/supabase/database.types.ts",
-    "scrape": "tsx scripts/scrape-buerohamburg.ts"
+    "scrape": "tsx scripts/scrape-buerohamburg.ts",
+    "db:seed:linked": "node scripts/seed-linked.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { MARKET_AREAS, marketAreaLabel } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 import { toggleValue, useSearch } from "./search-context";
@@ -19,10 +20,13 @@ export function DistrictPicker({ className, size = "default" }: { className?: st
     const q = query.trim().toLowerCase();
     const groups = new Map<string, typeof districts>();
     for (const d of districts) {
-      if (q && !d.name.toLowerCase().includes(q) && !d.borough.toLowerCase().includes(q)) continue;
-      groups.set(d.borough, [...(groups.get(d.borough) ?? []), d]);
+      const area = marketAreaLabel(d.marketArea);
+      if (q && !d.name.toLowerCase().includes(q) && !area.toLowerCase().includes(q)) continue;
+      groups.set(area, [...(groups.get(area) ?? []), d]);
     }
-    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b, "de"));
+    // Reihenfolge der Lagen wie auf buerohamburg.de
+    const order = MARKET_AREAS.map((m) => m.label as string);
+    return [...groups.entries()].sort(([a], [b]) => order.indexOf(a) - order.indexOf(b));
   }, [districts, query]);
 
   const names = selected.map((slug) => districts.find((d) => d.slug === slug)?.name ?? slug);
@@ -60,7 +64,7 @@ export function DistrictPicker({ className, size = "default" }: { className?: st
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Stadtteil oder Bezirk suchen"
+              placeholder="Stadtteil oder Lage suchen"
               className="h-9 w-full rounded-md bg-muted pr-3 pl-8 text-sm outline-none focus:ring-2 focus:ring-ring/40"
             />
           </div>
