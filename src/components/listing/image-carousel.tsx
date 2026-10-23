@@ -1,8 +1,9 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
+import { useSwipeArea } from "@/hooks/use-swipe";
 import type { PropertyImage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -37,6 +38,11 @@ export function ImageCarousel({
   const visible = images.slice(0, maxImages);
   const image = visible[index];
 
+  const go = (delta: number) => setIndex((i) => (i + delta + visible.length) % visible.length);
+  // Wischen auch dann, wenn eine Link-Fläche der Karte über dem Bild liegt (siehe data-swipe-area)
+  const rootRef = useRef<HTMLDivElement>(null);
+  useSwipeArea(rootRef, { onNext: () => go(1), onPrevious: () => go(-1) }, visible.length > 1);
+
   const step = (delta: number) => (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -44,7 +50,7 @@ export function ImageCarousel({
   };
 
   return (
-    <div className={cn("relative aspect-[16/10] overflow-hidden bg-muted", className)}>
+    <div ref={rootRef} className={cn("relative aspect-[16/10] overflow-hidden bg-muted", className)}>
       <ListingImage
         src={image?.url}
         alt={image?.alt ?? alt}

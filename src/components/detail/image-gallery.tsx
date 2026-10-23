@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ListingImage } from "@/components/listing/listing-image";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { PropertyImage } from "@/lib/types";
+import { useSwipe } from "@/hooks/use-swipe";
 import { cn } from "@/lib/utils";
 
 export function ImageGallery({ images, title }: { images: PropertyImage[]; title: string }) {
@@ -20,6 +21,7 @@ export function ImageGallery({ images, title }: { images: PropertyImage[]; title
     (delta: number) => setIndex((i) => (i + delta + images.length) % images.length),
     [images.length],
   );
+  const swipe = useSwipe({ onNext: () => step(1), onPrevious: () => step(-1) });
 
   useEffect(() => {
     if (!open) return;
@@ -71,10 +73,11 @@ export function ImageGallery({ images, title }: { images: PropertyImage[]; title
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-[min(1200px,96vw)] gap-0 overflow-hidden border-0 bg-black p-0 text-white sm:max-w-[min(1200px,96vw)]">
+        {/* flex statt grid: Bei grid wächst die Spalte mit der Vorschauleiste über die Dialogbreite hinaus */}
+        <DialogContent className="flex max-h-[calc(100dvh-2rem)] max-w-[min(1200px,96vw)] flex-col gap-0 overflow-hidden border-0 bg-black p-0 text-white sm:max-w-[min(1200px,96vw)]">
           <DialogTitle className="sr-only">Bildergalerie: {title}</DialogTitle>
           {/* Bildhöhe an das Fenster anpassen: höchstens 3:2 der Breite, aber immer Platz für Unterschrift und Vorschaubilder */}
-          <div className="relative h-[min(calc(100dvh-9.5rem),calc(min(1200px,96vw)*0.6667))] w-full">
+          <div className="relative h-[min(calc(100dvh-9.5rem),calc(min(1200px,96vw)*0.6667))] w-full shrink-0" {...swipe}>
             <ListingImage
               key={images[index]?.id}
               src={images[index]?.url}
@@ -96,7 +99,7 @@ export function ImageGallery({ images, title }: { images: PropertyImage[]; title
               {index + 1} / {images.length}
             </span>
           </div>
-          <div className="flex gap-2 overflow-x-auto px-4 pb-4">
+          <div className="flex min-w-0 gap-2 overflow-x-auto px-4 pb-4">
             {images.map((image, i) => (
               <button
                 key={image.id}

@@ -30,6 +30,7 @@ export const ListingCard = forwardRef<HTMLElement, ListingCardProps>(function Li
   return (
     <article
       ref={ref}
+      data-swipe-area
       onMouseEnter={() => onHoverChange?.(listing.id)}
       onMouseLeave={() => onHoverChange?.(null)}
       className={cn(

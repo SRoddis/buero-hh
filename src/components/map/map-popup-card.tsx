@@ -25,7 +25,7 @@ export function MapListingPreview({
   const street = marker.address.split(",")[0];
 
   return (
-    <div className="group relative">
+    <div className="group relative" data-swipe-area>
       <ImageCarousel
         // key: beim Wechsel des Angebots wieder beim ersten Bild beginnen
         key={marker.id}
