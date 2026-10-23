@@ -1,0 +1,23 @@
+{
+  "name": "buero-hh-filemaker-sync",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Synchronisiert Immobilien aus FileMaker (Data API) nach Supabase",
+  "type": "module",
+  "scripts": {
+    "sync": "tsx src/index.ts",
+    "sync:full": "tsx src/index.ts --full",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4.23.15",
+    "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

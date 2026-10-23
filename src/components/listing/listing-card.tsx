@@ -1,0 +1,100 @@
+"use client";
+
+import { ArrowRight, DoorOpen, Layers, MapPin, Ruler } from "lucide-react";
+import Link from "next/link";
+import { forwardRef } from "react";
+
+import { FavoriteButton } from "@/components/favorites/favorite-button";
+import { formatAreaRange, formatFloorRange, formatRentLabel } from "@/lib/format";
+import type { ListingSummary } from "@/lib/types";
+import { cn } from "@/lib/utils";
+
+import { ImageCarousel } from "./image-carousel";
+import { ListingBadges } from "./listing-badges";
+
+interface ListingCardProps {
+  listing: ListingSummary;
+  highlighted?: boolean;
+  onHoverChange?: (id: string | null) => void;
+  priority?: boolean;
+  className?: string;
+}
+
+export const ListingCard = forwardRef<HTMLElement, ListingCardProps>(function ListingCard(
+  { listing, highlighted, onHoverChange, priority, className },
+  ref,
+) {
+  return (
+    <article
+      ref={ref}
+      onMouseEnter={() => onHoverChange?.(listing.id)}
+      onMouseLeave={() => onHoverChange?.(null)}
+      className={cn(
+        "group relative flex flex-col overflow-hidden rounded-xl border bg-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg",
+        highlighted && "border-brand/60 shadow-lg ring-2 ring-brand/40",
+        className,
+      )}
+    >
+      <ImageCarousel
+        images={listing.images}
+        alt={listing.title}
+        priority={priority}
+        sizes="(min-width: 1536px) 22vw, (min-width: 1024px) 28vw, (min-width: 640px) 50vw, 100vw"
+      >
+        <ListingBadges type={listing.type} features={listing.features} className="absolute bottom-3 left-3" />
+        <FavoriteButton listingId={listing.id} className="absolute top-3 right-3 z-10" />
+      </ImageCarousel>
+
+      <div className="flex flex-1 flex-col gap-2.5 p-4">
+        <div>
+          <h3 className="line-clamp-1 text-base font-semibold text-foreground">
+            <Link href={`/immobilien/${listing.slug}`} className="after:absolute after:inset-0">
+              {listing.title}
+            </Link>
+          </h3>
+          <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+            <MapPin className="size-3.5 shrink-0" />
+            <span className="truncate">{listing.districtName}, Hamburg</span>
+          </p>
+        </div>
+
+        <dl className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground">
+          <Fact icon={Ruler} label="Fläche">
+            {formatAreaRange(listing.areaMin, listing.areaMax)}
+          </Fact>
+          <Fact icon={DoorOpen} label="Räume">
+            {listing.rooms != null
+              ? `${listing.rooms} ${listing.rooms === 1 ? "Raum" : "Räume"}`
+              : listing.unitCount > 1
+                ? "flexibel"
+                : "offen"}
+          </Fact>
+          <Fact icon={Layers} label="Etage">
+            {formatFloorRange(listing.floorMin, listing.floorMax)}
+          </Fact>
+        </dl>
+
+        <div className="mt-auto flex items-end justify-between pt-1">
+          <p className="text-lg font-bold text-foreground">
+            {formatRentLabel(listing)}
+            {listing.rentMin != null && (
+              <span className="ml-1.5 text-xs font-normal text-muted-foreground">zzgl. NK</span>
+            )}
+          </p>
+          <ArrowRight className="size-5 text-brand transition-transform group-hover:translate-x-1" />
+        </div>
+      </div>
+    </article>
+  );
+});
+
+function Fact({ icon: Icon, label, children }: { icon: typeof Ruler; label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <dt className="sr-only">{label}</dt>
+      <Icon className="size-4 shrink-0" aria-hidden />
+      <dd>{children}</dd>
+    </div>
+  );
+}
+
