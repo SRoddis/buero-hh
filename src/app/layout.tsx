@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 
 import { FavoritesProvider } from "@/components/favorites/favorites-provider";
 import { SiteFooter } from "@/components/layout/site-footer";
+import { ScrollToTop } from "@/components/layout/scroll-to-top";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             <SiteHeader />
             <div className="flex flex-1 flex-col">{children}</div>
             <SiteFooter />
+            <ScrollToTop />
             <Toaster position="bottom-center" />
           </FavoritesProvider>
         </TooltipProvider>

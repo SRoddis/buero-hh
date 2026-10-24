@@ -17,8 +17,8 @@ const SOURCE = "filemaker";
 const MAX_CHANGED_PER_RUN = 120;
 /** So viele Objekte werden pro Lauf zusätzlich reihum vollständig geprüft (Details + Bilder) */
 const ROLLING_PER_RUN = 60;
-/** Parallele Anfragen an buerohamburg.de */
-const CONCURRENCY = 4;
+/** Parallele Anfragen an buerohamburg.de (deren Backend liefert bei mehr Last vermehrt falsche 404) */
+const CONCURRENCY = 3;
 /** Fehlen mehr als dieser Anteil, wird nichts archiviert (Schutz vor gestörter API-Antwort) */
 const MAX_MISSING_SHARE = 0.05;
 /** Archivierte Objekte werden nach so vielen Tagen endgültig gelöscht */
@@ -145,6 +145,14 @@ export async function runSync(db: SupabaseClient) {
 
     // 6) Lange archivierte Objekte endgültig löschen (inkl. Bilder im Storage)
     stats.purged = await purgeArchived(db);
+
+    // 7) Vorberechnetes Suchmodell aktualisieren, wenn sich etwas geändert hat
+    const changedSomething =
+      stats.created + stats.updated + stats.restored + stats.archived + stats.purged + stats.rechecked > 0;
+    if (changedSomething) {
+      const { error: refreshError } = await db.rpc("refresh_property_listings");
+      if (refreshError) throw refreshError;
+    }
 
     await db.from("sync_runs").update({ status: "succeeded", finished_at: new Date().toISOString(), stats }).eq("id", run.id);
     return stats;

@@ -18,7 +18,7 @@ const POPULAR_DISTRICTS = [
 
 export function SiteFooter() {
   return (
-    <footer className="mt-auto bg-[#2a1017] text-white/75">
+    <footer id="site-footer" className="mt-auto bg-[#2a1017] text-white/75">
       <div className="mx-auto grid max-w-[1600px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-2 lg:grid-cols-4 lg:px-8">
         <div className="space-y-4">
           <Logo />

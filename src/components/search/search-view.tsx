@@ -38,6 +38,20 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
   // Bewusst kein automatisches Scrollen zur Listenkarte bei Auswahl auf der Karte: Das würde die
   // Seite und damit die Karte unter dem Mauszeiger verschieben, sodass der nächste Klick daneben geht.
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /** Anforderung „auf der Karte anzeigen“ – seq unterscheidet wiederholte Klicks auf dasselbe Objekt */
+  const [mapFocus, setMapFocus] = useState<{ id: string; seq: number } | null>(null);
+
+  const showOnMap = (id: string) => {
+    if (mapSize === 0) setMapSize(1);
+    const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
+    if (!isDesktop) {
+      setView("karte");
+      window.scrollTo({ top: 0 });
+    }
+    setSelectedId(id);
+    // erst nach dem Umschalten, damit die Karte ihre endgültige Größe hat
+    requestAnimationFrame(() => setMapFocus((f) => ({ id, seq: (f?.seq ?? 0) + 1 })));
+  };
 
   const listRef = useRef<HTMLElement>(null);
 
@@ -95,6 +109,7 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
                     priority={i < 2}
                     highlighted={listing.id === hoveredId || listing.id === selectedId}
                     onHoverChange={setHoveredId}
+                    onShowOnMap={() => showOnMap(listing.id)}
                   />
                 ))}
               </div>
@@ -122,12 +137,12 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
               markers={result.markers}
               hoveredId={hoveredId}
               selectedId={selectedId}
-              onHover={setHoveredId}
               onSelect={setSelectedId}
               bbox={filters.bbox}
               onBboxChange={(bbox) => update({ bbox })}
               fitKey={fitKey}
               colorCategory={filters.category}
+              focus={mapFocus}
             />
             {view === "liste" && <MapSizeControls size={mapSize} onChange={setMapSize} />}
           </div>

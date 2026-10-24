@@ -14,6 +14,7 @@ import { MapListingPreview } from "./map-popup-card";
  */
 export function MapGroupCard({
   markers,
+  initialId,
   onActiveChange,
   onClose,
   onShowAll,
@@ -21,6 +22,8 @@ export function MapGroupCard({
   className,
 }: {
   markers: MapMarker[];
+  /** Angebot, mit dem die Karte startet (z. B. aus „Auf der Karte anzeigen“) */
+  initialId?: string;
   /** Meldet das aktuell angezeigte Angebot (für den Preis-Pin auf der Karte) */
   onActiveChange: (id: string) => void;
   onClose: () => void;
@@ -29,11 +32,12 @@ export function MapGroupCard({
   compact?: boolean;
   className?: string;
 }) {
-  const [index, setIndex] = useState(0);
+  const startIndex = Math.max(0, markers.findIndex((m) => m.id === initialId));
+  const [index, setIndex] = useState(startIndex);
   const marker = markers[Math.min(index, markers.length - 1)];
 
-  // Neue Gruppe → wieder beim ersten Angebot beginnen
-  useEffect(() => setIndex(0), [markers]);
+  // Neue Gruppe → beim gewählten bzw. ersten Angebot beginnen
+  useEffect(() => setIndex(startIndex), [markers, startIndex]);
 
   // Der Preis-Pin auf der Karte folgt dem angezeigten Angebot
   const markerId = marker?.id;

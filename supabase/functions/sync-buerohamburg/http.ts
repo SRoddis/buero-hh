@@ -3,7 +3,7 @@
 const USER_AGENT = "BueroHamburg-Sync/1.0 (+https://buero-hh.onrender.com)";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function fetchJson<T>(url: string, attempts = 4): Promise<T | null> {
+export async function fetchJson<T>(url: string, attempts = 5): Promise<T | null> {
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
       const res = await fetch(url, { headers: { "User-Agent": USER_AGENT, Accept: "application/json" } });
@@ -12,7 +12,8 @@ export async function fetchJson<T>(url: string, attempts = 4): Promise<T | null>
     } catch {
       // Netzwerkfehler → erneut versuchen
     }
-    if (attempt < attempts) await sleep(800 * attempt);
+    // wachsende Pause: 1,2 s, 2,4 s, 3,6 s, 4,8 s
+    if (attempt < attempts) await sleep(1200 * attempt);
   }
   return null;
 }

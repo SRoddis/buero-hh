@@ -4,17 +4,25 @@ import resize, { initResize } from "npm:@jsquash/resize@2.1.0";
 import encodeWebp, { init as initWebp } from "npm:@jsquash/webp@1.5.0/encode.js";
 
 import { bhImageUrl, BH_MAX_IMAGES } from "../_shared/buerohamburg.ts";
-import { checksumOf, download, head } from "./http.ts";
+import { checksumOf, download, head, mapLimit } from "./http.ts";
 
 const BUCKET = "property-images";
 const SOURCE = "filemaker";
 /** Bilder pro Minute (jedes in einem eigenen Aufruf – eine Umwandlung braucht ~0,5 s CPU, Limit 2 s) */
-const IMAGES_PER_DISPATCH = 15;
+const IMAGES_PER_DISPATCH = 8;
+/**
+ * Umwandlungen strikt nacheinander: Supabase legt die Einzelaufrufe oft in denselben Worker, der sich
+ * Speicher (256 MB) und CPU-Budget (2 s) teilt – parallel führte das zu WORKER_RESOURCE_LIMIT bzw.
+ * „CPU Time exceeded“ für beide Aufrufe.
+ */
+const IMAGE_CONCURRENCY = 1;
 const MAX_ATTEMPTS = 3;
 /** Hängende Verarbeitungen nach dieser Zeit zurück in die Warteschlange */
 const STALE_PROCESSING_MINUTES = 10;
 const SIZES = { large: 1280, thumb: 640 } as const;
 const WEBP_OPTIONS = { quality: 72, method: 2 };
+/** Schnelleres, leicht weicheres Skalieren – spart CPU und ergibt kleinere Dateien */
+const RESIZE_METHOD = "triangle" as const;
 
 interface ImageRow {
   id: string;
@@ -22,6 +30,7 @@ interface ImageRow {
   sort_order: number;
   checksum: string | null;
   storage_paths: string[];
+  status: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -38,7 +47,7 @@ export async function discoverImages(db: SupabaseClient, propertyId: string, ref
 
   const { data: existing, error } = await db
     .from("property_images")
-    .select("id, external_id, sort_order, checksum, storage_paths")
+    .select("id, external_id, sort_order, checksum, storage_paths, status")
     .eq("property_id", propertyId);
   if (error) throw error;
   const rows = (existing ?? []) as ImageRow[];
@@ -65,7 +74,7 @@ export async function discoverImages(db: SupabaseClient, propertyId: string, ref
       });
       if (insertError) throw insertError;
       queued++;
-    } else if (row.checksum !== image.checksum) {
+    } else if (row.checksum !== image.checksum && (row.status === "done" || row.status === "failed")) {
       // Bild geändert – alte Varianten bleiben sichtbar, bis die neuen fertig sind
       await db
         .from("property_images")
@@ -73,6 +82,7 @@ export async function discoverImages(db: SupabaseClient, propertyId: string, ref
         .eq("id", row.id);
       queued++;
     }
+    // Bilder, die ohnehin noch in der Warteschlange stehen, bleiben unverändert (nicht doppelt zählen)
   }
 
   // Bilder, die es bei buerohamburg.de nicht mehr gibt
@@ -119,19 +129,19 @@ export async function dispatchImages(db: SupabaseClient, secret: string) {
     .select("id");
 
   const self = `${Deno.env.get("SUPABASE_URL")}/functions/v1/sync-buerohamburg`;
-  const results = await Promise.allSettled(
-    (claimed ?? []).map((row) =>
-      fetch(self, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-sync-secret": secret },
-        body: JSON.stringify({ mode: "image", id: row.id }),
-      }).then((r) => r.ok),
-    ),
+  const results = await mapLimit(claimed ?? [], IMAGE_CONCURRENCY, (row) =>
+    fetch(self, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-sync-secret": secret },
+      body: JSON.stringify({ mode: "image", id: row.id }),
+    })
+      .then((r) => r.ok)
+      .catch(() => false),
   );
-  return {
-    dispatched: claimed?.length ?? 0,
-    succeeded: results.filter((r) => r.status === "fulfilled" && r.value).length,
-  };
+  const succeeded = results.filter(Boolean).length;
+  // Neue Bild-URLs in das vorberechnete Suchmodell übernehmen
+  if (succeeded > 0) await db.rpc("refresh_property_listings");
+  return { dispatched: claimed?.length ?? 0, succeeded };
 }
 
 // ---------------------------------------------------------------------------
@@ -173,7 +183,7 @@ export async function processImage(db: SupabaseClient, id: string) {
 
     // Nie hochskalieren; 640 px aus der 1280-px-Fassung (spart CPU)
     const scale = (img: ImageData, width: number) =>
-      img.width <= width ? img : resize(img, { width, height: Math.round((img.height / img.width) * width) });
+      img.width <= width ? img : resize(img, { width, height: Math.round((img.height / img.width) * width), method: RESIZE_METHOD });
     const large = await scale(original, SIZES.large);
     const largeWebp = await encodeWebp(large, WEBP_OPTIONS);
     const thumb = await scale(large, SIZES.thumb);

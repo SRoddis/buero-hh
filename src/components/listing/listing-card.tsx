@@ -17,12 +17,14 @@ interface ListingCardProps {
   listing: ListingSummary;
   highlighted?: boolean;
   onHoverChange?: (id: string | null) => void;
+  /** Zeigt einen Button, der das Objekt auf der Karte anzeigt (nur in der Suche mit Karte) */
+  onShowOnMap?: () => void;
   priority?: boolean;
   className?: string;
 }
 
 export const ListingCard = forwardRef<HTMLElement, ListingCardProps>(function ListingCard(
-  { listing, highlighted, onHoverChange, priority, className },
+  { listing, highlighted, onHoverChange, onShowOnMap, priority, className },
   ref,
 ) {
   const furtherAreas = formatFurtherAreas(listing);
@@ -46,7 +48,24 @@ export const ListingCard = forwardRef<HTMLElement, ListingCardProps>(function Li
         sizes="(min-width: 1536px) 22vw, (min-width: 1024px) 28vw, (min-width: 640px) 50vw, 100vw"
       >
         <ListingBadges categories={listing.categories} features={listing.features} className="absolute bottom-3 left-3" />
-        <FavoriteButton listingId={listing.id} className="absolute top-3 right-3 z-10" />
+        <div className="absolute top-3 right-3 z-10 flex gap-2">
+          {onShowOnMap && listing.lat != null && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onShowOnMap();
+              }}
+              aria-label="Auf der Karte anzeigen"
+              title="Auf der Karte anzeigen"
+              className="inline-flex size-9 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm transition-all hover:bg-black/40 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+            >
+              <MapPin className="size-5" strokeWidth={2} />
+            </button>
+          )}
+          <FavoriteButton listingId={listing.id} />
+        </div>
       </ImageCarousel>
 
       <div className="flex flex-1 flex-col gap-2.5 p-4">

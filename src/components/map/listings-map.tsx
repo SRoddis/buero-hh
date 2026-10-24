@@ -11,6 +11,7 @@ import {
   type Offset,
   setWorkerUrl,
   type GeoJSONSource,
+  type FilterSpecification,
   type Point,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -36,13 +37,14 @@ export interface ListingsMapProps {
   /** Objekt, über dem in der Liste gerade die Maus steht */
   hoveredId: string | null;
   selectedId: string | null;
-  onHover: (id: string | null) => void;
   onSelect: (id: string | null) => void;
   /** Aktiver Kartenausschnitt-Filter; null = Suche in ganz Hamburg */
   bbox: SearchFilters["bbox"];
   onBboxChange: (bbox: SearchFilters["bbox"]) => void;
   /** Ändert sich, wenn sich die Filter ändern – dann wird auf die Treffer gezoomt */
   fitKey: string;
+  /** „Auf der Karte anzeigen“: zum Objekt fliegen (seq ändert sich bei jedem Klick) */
+  focus?: { id: string; seq: number } | null;
   /** Aktiver Objektart-Filter – bestimmt die Punktfarbe gemischter Objekte */
   colorCategory?: PropertyCategory | null;
   className?: string;
@@ -63,6 +65,34 @@ const POPUP_OFFSET: Offset = {
 
 /** Unterhalb dieser Kartenbreite (px) erscheint die Objektkarte als feste Overlay-Karte */
 const COMPACT_MAX_WIDTH = 520;
+/** Zoomstufe für „Auf der Karte anzeigen“: Straßen und Umgebung erkennbar, nicht zu nah */
+const FOCUS_ZOOM = 15;
+/** Clustering – auch für die Berechnung, ab welcher Zoomstufe sich ein Objekt aus seinem Cluster löst */
+const CLUSTER_RADIUS = 46;
+const CLUSTER_MAX_ZOOM = 18;
+
+/**
+ * Zoomstufe, auf der das Objekt nicht mehr mit Nachbarn zu einem Kreis verschmilzt (mind. FOCUS_ZOOM).
+ * Objekte an exakt derselben Adresse bleiben bewusst eine Gruppe.
+ */
+function separationZoom(target: MapMarker, markers: MapMarker[]) {
+  const toRad = Math.PI / 180;
+  const metersPerDegLat = 111_320;
+  const metersPerDegLng = metersPerDegLat * Math.cos(target.lat * toRad);
+  let nearest = Infinity;
+  for (const m of markers) {
+    if (m.id === target.id) continue;
+    const d = Math.hypot((m.lat - target.lat) * metersPerDegLat, (m.lng - target.lng) * metersPerDegLng);
+    if (d > 1 && d < nearest) nearest = d; // > 1 m: gleiche Adresse ignorieren
+  }
+  if (!Number.isFinite(nearest)) return FOCUS_ZOOM;
+  // Meter pro Pixel bei Zoom z (512-px-Kacheln): 40075016.686 · cos(lat) / (512 · 2^z)
+  const needed = Math.log2((40_075_016.686 * Math.cos(target.lat * toRad) * CLUSTER_RADIUS) / (512 * nearest)) + 0.6;
+  return Math.min(CLUSTER_MAX_ZOOM, Math.max(FOCUS_ZOOM, needed));
+}
+/** Verschiebung (px) nach unten beim Anfliegen auf dem Desktop – Platz für das Popup über dem Pin */
+const FOCUS_POPUP_SHIFT = 150;
+
 /** Abstand (px) vom oberen sichtbaren Kartenrand, ab dem der freie Bereich über der Overlay-Karte zählt */
 const COMPACT_TOP_INSET = 16;
 /** Verschiebung (px) beim Öffnen einer Gruppenliste auf dem Desktop */
@@ -79,7 +109,7 @@ function boundsToBbox(map: MapLibreMap): Bbox {
 }
 
 export default function ListingsMap(props: ListingsMapProps) {
-  const { markers, hoveredId, selectedId, bbox, fitKey, colorCategory = null, className } = props;
+  const { markers, hoveredId, selectedId, bbox, fitKey, focus = null, colorCategory = null, className } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const popupRef = useRef<Popup | null>(null);
@@ -87,11 +117,25 @@ export default function ListingsMap(props: ListingsMapProps) {
   const compactCardRef = useRef<HTMLDivElement>(null);
   const pinRef = useRef<Marker | null>(null);
   const lastFitKey = useRef<string | null>(null);
+  const lastFocusSeq = useRef(0);
+  const markersRef = useRef(markers);
+  markersRef.current = markers;
+  /** Cluster, der das aktive Objekt enthält und unter dem Preis-Pin liegt */
+  const [pinClusterId, setPinClusterId] = useState<number | null>(null);
+  const updatePinClusterRef = useRef<() => void>(() => {});
   const [ready, setReady] = useState(false);
   /** Schmale Karte: Objektkarte als feste Overlay-Karte statt Popup, damit sie nie abgeschnitten wird */
   const [compact, setCompact] = useState(false);
   /** Mehrere Angebote am selben Ort (aus einem nicht weiter teilbaren Cluster) */
-  const [group, setGroup] = useState<{ ids: string[]; lng: number; lat: number } | null>(null);
+  const [group, setGroup] = useState<{
+    ids: string[];
+    lng: number;
+    lat: number;
+    /** null, wenn die Gruppe aus der Liste geöffnet wurde (Cluster dann über pinClusterId) */
+    clusterId: number | null;
+    /** Angebot, mit dem die Gruppenkarte startet */
+    initialId?: string;
+  } | null>(null);
   /** Aktuell angezeigtes Angebot in der Gruppenkarte */
   const [groupActiveId, setGroupActiveId] = useState<string | null>(null);
   const popupNode = useMemo(() => document.createElement("div"), []);
@@ -109,7 +153,8 @@ export default function ListingsMap(props: ListingsMapProps) {
 
   const markersById = useMemo(() => new Map(markers.map((m) => [m.id, m])), [markers]);
   const selectedMarker = selectedId ? markersById.get(selectedId) : undefined;
-  const activeMarker = markersById.get(hoveredId ?? selectedId ?? (group ? groupActiveId : null) ?? "");
+  // Das aktive Objekt (offenes Popup bzw. Gruppenkarte) hat Vorrang; Hover aus der Liste nur, wenn nichts aktiv ist
+  const activeMarker = markersById.get(selectedId ?? (group ? groupActiveId : null) ?? hoveredId ?? "");
   const groupMarkers = useMemo(
     () => (group ? group.ids.map((id) => markersById.get(id)).filter((m): m is MapMarker => Boolean(m)) : []),
     [group, markersById],
@@ -150,10 +195,10 @@ export default function ListingsMap(props: ListingsMapProps) {
         type: "geojson",
         data: toFeatureCollection(latest.current.markers, latest.current.colorCategory),
         cluster: true,
-        clusterRadius: 46,
+        clusterRadius: CLUSTER_RADIUS,
         // Bis zur maximalen Zoomstufe clustern: Angebote mit identischer Adresse liegen sonst
         // unsichtbar übereinander – so bleiben sie als Kreis mit Anzahl erkennbar
-        clusterMaxZoom: 18,
+        clusterMaxZoom: CLUSTER_MAX_ZOOM,
       });
 
       map.addLayer({
@@ -167,6 +212,14 @@ export default function ListingsMap(props: ListingsMapProps) {
           "circle-stroke-width": 3,
           "circle-stroke-color": "rgba(255,255,255,0.9)",
         },
+      });
+      // Unsichtbare Kopie der Cluster ohne Ausblend-Filter – zum Ermitteln des Clusters unter dem Preis-Pin
+      map.addLayer({
+        id: "clusters-hit",
+        type: "circle",
+        source: "listings",
+        filter: ["has", "point_count"],
+        paint: { "circle-radius": ["step", ["get", "point_count"], 17, 8, 21, 20, 26], "circle-opacity": 0 },
       });
       map.addLayer({
         id: "cluster-count",
@@ -226,7 +279,7 @@ export default function ListingsMap(props: ListingsMapProps) {
           if (source && zoom != null && zoom > map.getMaxZoom()) {
             const leaves = await source.getClusterLeaves(clusterId, 500, 0);
             latest.current.onSelect(null);
-            setGroup({ ids: leaves.map((f) => f.properties?.id as string), lng, lat });
+            setGroup({ ids: leaves.map((f) => f.properties?.id as string), lng, lat, clusterId });
             return;
           }
           setGroup(null);
@@ -239,23 +292,18 @@ export default function ListingsMap(props: ListingsMapProps) {
         latest.current.onSelect(null);
       });
 
-      let mapHoverId: string | null = null;
-      const setMapHover = (id: string | null) => {
-        if (id === mapHoverId) return;
-        mapHoverId = id;
-        latest.current.onHover(id);
-      };
+      // Hover über Kartenpunkten nur als Cursor – der Preis-Pin erscheint erst beim Anklicken
       map.on("mousemove", (e) => {
-        const id = (pointAt(e.point)?.properties.id as string | undefined) ?? null;
-        map.getCanvas().style.cursor = id || clusterAt(e.point) ? "pointer" : "";
-        setMapHover(id);
+        map.getCanvas().style.cursor = pointAt(e.point) || clusterAt(e.point) ? "pointer" : "";
       });
-      map.on("mouseout", () => setMapHover(null));
 
       // Nur Nutzerinteraktionen (mit originalEvent) lösen eine neue Ausschnittsuche aus
       map.on("moveend", (e) => {
         if (e.originalEvent && latest.current.bbox) latest.current.onBboxChange(boundsToBbox(map));
       });
+
+      // Cluster ändern sich beim Zoomen – Cluster unter dem Preis-Pin danach neu bestimmen
+      map.on("idle", () => updatePinClusterRef.current());
 
       setReady(true);
     });
@@ -298,6 +346,48 @@ export default function ListingsMap(props: ListingsMapProps) {
     }
   }, [ready, markers, fitKey, bbox, colorCategory]);
 
+  // Kreis bzw. Punkt unter dem Preis-Pin ausblenden – sonst schaut ein Cluster-Kreis hinter dem Pin hervor
+  const hiddenPointId = activeMarker?.id ?? null;
+  const hiddenClusterId = showGroup ? (group?.clusterId ?? pinClusterId) : pinClusterId;
+
+  const pinTarget = selectedMarker ?? (showGroup ? markersById.get(groupActiveId ?? "") : undefined);
+  // Liegt das ausgewählte Objekt in einem Cluster, dessen Kreis unter dem Preis-Pin sitzt, wird dieser ausgeblendet
+  // (nicht beim bloßen Hover über die Liste – sonst verschwänden z. B. große Übersichts-Cluster)
+  updatePinClusterRef.current = async () => {
+    const map = mapRef.current;
+    const marker = pinTarget;
+    if (!map || !marker) return setPinClusterId(null);
+    const p = map.project([marker.lng, marker.lat]);
+    const candidates = map.queryRenderedFeatures(
+      [
+        [p.x - 2, p.y - 2],
+        [p.x + 2, p.y + 2],
+      ],
+      { layers: ["clusters-hit"] },
+    );
+    const source = map.getSource<GeoJSONSource>("listings");
+    for (const cluster of candidates) {
+      const clusterId = cluster.properties.cluster_id as number;
+      const leaves = await source?.getClusterLeaves(clusterId, 1000, 0).catch(() => []);
+      if (leaves?.some((f) => f.properties?.id === marker.id)) return setPinClusterId(clusterId);
+    }
+    setPinClusterId(null);
+  };
+  useEffect(() => {
+    if (ready) updatePinClusterRef.current();
+  }, [ready, pinTarget]);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    const isPoint: FilterSpecification = ["!", ["has", "point_count"]];
+    const isCluster: FilterSpecification = ["has", "point_count"];
+    map.setFilter("points", hiddenPointId ? ["all", isPoint, ["!=", ["get", "id"], hiddenPointId]] : isPoint);
+    const clusterFilter: FilterSpecification =
+      hiddenClusterId != null ? ["all", isCluster, ["!=", ["get", "cluster_id"], hiddenClusterId]] : isCluster;
+    map.setFilter("clusters", clusterFilter);
+    map.setFilter("cluster-count", clusterFilter);
+  }, [ready, hiddenPointId, hiddenClusterId]);
+
   // Preis-Pin für das Objekt, das in der Liste oder Karte aktiv ist
   useEffect(() => {
     const map = mapRef.current;
@@ -319,6 +409,32 @@ export default function ListingsMap(props: ListingsMapProps) {
     popupRef.current = null;
     const target = selectedMarker ?? (showGroup && group ? { lng: group.lng, lat: group.lat } : null);
     if (!target) return;
+    // Aus der Liste angefordert („Auf der Karte anzeigen“)
+    const pendingFocus = focus && focus.seq !== lastFocusSeq.current ? focus : null;
+    if (pendingFocus && selectedMarker?.id === pendingFocus.id) {
+      // Weitere Angebote an derselben Adresse → Gruppenkarte öffnen, direkt beim gewählten Angebot
+      const siblings = markersRef.current.filter(
+        (m) => Math.abs(m.lng - selectedMarker.lng) < 1e-6 && Math.abs(m.lat - selectedMarker.lat) < 1e-6,
+      );
+      if (siblings.length > 1) {
+        setGroup({
+          ids: siblings.map((m) => m.id),
+          lng: selectedMarker.lng,
+          lat: selectedMarker.lat,
+          clusterId: null,
+          initialId: selectedMarker.id,
+        });
+        latest.current.onSelect(null);
+        return;
+      }
+    }
+    // …dann so nah heran, dass sich das Objekt aus seinem Cluster löst
+    const focusMarker =
+      pendingFocus && (selectedMarker?.id === pendingFocus.id || (showGroup && group?.ids.includes(pendingFocus.id)))
+        ? markersRef.current.find((m) => m.id === pendingFocus.id)
+        : undefined;
+    const focusZoom = focusMarker ? separationZoom(focusMarker, markersRef.current) : null;
+    if (focusZoom) lastFocusSeq.current = pendingFocus!.seq;
 
     if (compact) {
       // Schmale Karte (Mobil): Die Objektkarte liegt fest unten. Den Punkt in die Mitte des freien
@@ -336,7 +452,11 @@ export default function ListingsMap(props: ListingsMapProps) {
         const cardTop = compactCardRef.current?.getBoundingClientRect().top ?? canvas.bottom;
         const freeTop = Math.max(canvasTop, 0) + COMPACT_TOP_INSET;
         const targetY = freeTop + Math.max(0, cardTop - freeTop) / 2;
-        map.easeTo({ center: [target.lng, target.lat], offset: [0, targetY - (canvasTop + canvas.height / 2)] });
+        map.easeTo({
+          center: [target.lng, target.lat],
+          offset: [0, targetY - (canvasTop + canvas.height / 2)],
+          ...(focusZoom ? { zoom: focusZoom, duration: 900 } : {}),
+        });
       });
       return () => cancelAnimationFrame(frame);
     }
@@ -356,13 +476,18 @@ export default function ListingsMap(props: ListingsMapProps) {
       .addTo(map);
     popupRef.current = popup;
 
-    if (!selectedMarker) {
+    if (focusZoom) {
+      // Objekt unterhalb der Mitte absetzen, damit das Popup darüber vollständig Platz hat
+      // Einzel-Popup öffnet über dem Pin, die höhere Gruppenkarte darunter
+      const shift = selectedMarker ? FOCUS_POPUP_SHIFT : -GROUP_LIST_SHIFT;
+      map.flyTo({ center: [target.lng, target.lat], zoom: focusZoom, offset: [0, shift], duration: 1200 });
+    } else if (!selectedMarker) {
       // Gruppenliste ist hoch: Ort in den oberen Kartenbereich schieben, damit die Liste darunter Platz hat
       map.easeTo({ center: [target.lng, target.lat], offset: [0, -GROUP_LIST_SHIFT] });
     } else if (!map.getBounds().contains([target.lng, target.lat])) {
       map.easeTo({ center: [target.lng, target.lat] });
     }
-  }, [ready, selectedMarker, showGroup, group, popupNode, compact]);
+  }, [ready, selectedMarker, showGroup, group, popupNode, compact, focus]);
 
   return (
     <div className={cn("relative size-full overflow-hidden bg-[#eef0f1]", className)}>
@@ -403,6 +528,7 @@ export default function ListingsMap(props: ListingsMapProps) {
             <div ref={compactCardRef} className="pointer-events-auto w-full max-w-[340px] overflow-hidden rounded-2xl shadow-[0_10px_30px_-8px_rgb(0_0_0/0.45)]">
               <MapGroupCard
                 markers={groupMarkers}
+                initialId={group?.initialId}
                 onActiveChange={setGroupActiveId}
                 onClose={closeGroup}
                 onShowAll={showGroupInList}
@@ -415,6 +541,7 @@ export default function ListingsMap(props: ListingsMapProps) {
           createPortal(
             <MapGroupCard
               markers={groupMarkers}
+              initialId={group?.initialId}
               onActiveChange={setGroupActiveId}
               onClose={closeGroup}
               onShowAll={showGroupInList}
