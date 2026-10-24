@@ -42,7 +42,10 @@ export interface RentalUnit {
 
 export interface PropertyImage {
   id: string;
+  /** Große Variante (WebP 1280 px) bzw. Original, solange noch nicht umgewandelt */
   url: string;
+  /** Kleine Variante (WebP 640 px) für Listen und Kartenpopups */
+  thumbUrl?: string;
   alt: string;
 }
 

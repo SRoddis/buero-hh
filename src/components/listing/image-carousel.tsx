@@ -52,7 +52,7 @@ export function ImageCarousel({
   return (
     <div ref={rootRef} className={cn("relative aspect-[16/10] overflow-hidden bg-muted", className)}>
       <ListingImage
-        src={image?.url}
+        src={image?.thumbUrl ?? image?.url}
         alt={image?.alt ?? alt}
         fill
         priority={priority}

@@ -111,7 +111,7 @@ export function ImageGallery({ images, title }: { images: PropertyImage[]; title
                 )}
                 aria-label={`Bild ${i + 1} anzeigen`}
               >
-                <ListingImage src={image.url} alt="" fill sizes="80px" />
+                <ListingImage src={image.thumbUrl ?? image.url} alt="" fill sizes="80px" />
               </button>
             ))}
           </div>

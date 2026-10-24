@@ -95,9 +95,40 @@ npm run db:seed:linked         # Seed-Pakete einspielen (idempotent, kann wieder
 ```
 
 - Quelle: `/api/objects/search` (Liste), `/api/objects/<nr>` (Details), Bilder `/objects/images/<nr>/NN_webBig.jpg`, Exposé `/objects/pdf/BHI_<nr>.pdf`
-- Die Umwandlung steckt in `scripts/lib/buerohamburg-transform.ts` (Feldzuordnung FileMaker → App, z. B. `web_suchKrit01–08` → Ausstattungsmerkmale, Courtage-Codes `bc`/`no` = courtagefrei)
+- Die Feldzuordnung steckt in `supabase/functions/_shared/buerohamburg.ts` (gemeinsam mit dem Sync; Zuordnung FileMaker → App, z. B. `web_suchKrit01–08` → Ausstattungsmerkmale, Courtage-Codes `bc`/`no` = courtagefrei)
 - Gleiche Adressen werden zu einem Gebäude zusammengefasst; Schlüssel ist die Objektnummer (`source = 'filemaker'`, `external_id`)
-- Bilder und PDFs werden vorerst direkt von buerohamburg.de geladen
+- Danach übernimmt der laufende Abgleich (siehe unten) – der Seed ist nur für die Ersteinrichtung nötig
+
+### Laufender Abgleich mit buerohamburg.de
+
+Die Edge Function `supabase/functions/sync-buerohamburg` hält Supabase aktuell. pg_cron ruft sie auf:
+
+| Zeitplan | Modus | Was passiert |
+| --- | --- | --- |
+| alle 10 Min. | `sync` | Objektliste abrufen, **Hash je Objekt** mit `properties.source_hash` vergleichen: neue/geänderte Objekte mit Details übernehmen, nicht mehr gelistete archivieren. Zusätzlich werden reihum 60 Objekte vollständig geprüft (Details + Bilder) – alle Objekte etwa alle 3 Stunden. |
+| jede Minute | `images` | Bild-Warteschlange: bis zu 15 Bilder je Minute in **WebP 1280 px + 640 px** umwandeln und in Storage (`property-images`) ablegen – ein Bild je Aufruf wegen des CPU-Limits von 2 s. |
+
+- **Löschschutz:** Fehlen mehr als 5 % der Objekte in einem Lauf, wird nichts archiviert. Archivierte Objekte verschwinden sofort von der Seite, kommen zurück, falls sie wieder auftauchen, und werden nach 7 Tagen samt Bildern gelöscht.
+- **Bilder** haben inhaltsabhängige Dateinamen (dauerhaft cachebar); bis zur Umwandlung zeigt die Seite das Original von buerohamburg.de.
+- **Protokoll:** jede Ausführung landet mit Zahlen in `sync_runs`.
+- Die Feldzuordnung (`supabase/functions/_shared/buerohamburg.ts`) nutzen Edge Function und Seed gemeinsam.
+
+**Einrichtung** (einmalig, Supabase Pro wegen des Speicherbedarfs von rund 1,6 GB für Bilder):
+
+```bash
+npm run db:push                                         # Migration inkl. pg_cron-Zeitplan
+npx supabase secrets set SYNC_SECRET=<zufälliger Wert>
+npm run functions:deploy
+```
+
+Danach im Supabase-Dashboard → SQL Editor:
+
+```sql
+select vault.create_secret('https://<projekt>.supabase.co', 'project_url');
+select vault.create_secret('<derselbe zufällige Wert>', 'sync_secret');
+```
+
+Prüfen: `select * from sync_runs order by started_at desc;` und `select status, count(*) from property_images group by status;`
 
 ### Datenmodell
 

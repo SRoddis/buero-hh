@@ -15,7 +15,13 @@
     "db:push": "supabase db push --linked",
     "db:types": "supabase gen types typescript --linked --schema public > src/lib/supabase/database.types.ts",
     "scrape": "tsx scripts/scrape-buerohamburg.ts",
-    "db:seed:linked": "node scripts/seed-linked.mjs"
+    "db:seed:linked": "node scripts/seed-linked.mjs",
+    "functions:deploy": "supabase functions deploy sync-buerohamburg --no-verify-jwt",
+    "predb:push": "node scripts/check-supabase-login.mjs",
+    "predb:types": "node scripts/check-supabase-login.mjs",
+    "predb:seed:linked": "node scripts/check-supabase-login.mjs",
+    "prefunctions:deploy": "node scripts/check-supabase-login.mjs",
+    "supabase:login": "supabase login"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

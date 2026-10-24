@@ -63,10 +63,8 @@ const POPUP_OFFSET: Offset = {
 
 /** Unterhalb dieser Kartenbreite (px) erscheint die Objektkarte als feste Overlay-Karte */
 const COMPACT_MAX_WIDTH = 520;
-/** Punkt um diesen Wert (px) über die Kartenmitte schieben, damit er oberhalb der Overlay-Karte liegt */
-const COMPACT_CARD_SHIFT = 130;
-/** Wie COMPACT_CARD_SHIFT, für die höhere Gruppenkarte */
-const COMPACT_GROUP_SHIFT = 225;
+/** Abstand (px) vom oberen sichtbaren Kartenrand, ab dem der freie Bereich über der Overlay-Karte zählt */
+const COMPACT_TOP_INSET = 16;
 /** Verschiebung (px) beim Öffnen einer Gruppenliste auf dem Desktop */
 const GROUP_LIST_SHIFT = 150;
 /** Halbe Kantenlänge (Grad, ≈ 20 m) des Ausschnitts für „Alle Angebote anzeigen“ */
@@ -85,6 +83,8 @@ export default function ListingsMap(props: ListingsMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const popupRef = useRef<Popup | null>(null);
+  /** Mobile Overlay-Karte (Einzelobjekt oder Gruppe) – zum Ausrichten des Punkts darüber */
+  const compactCardRef = useRef<HTMLDivElement>(null);
   const pinRef = useRef<Marker | null>(null);
   const lastFitKey = useRef<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -321,9 +321,24 @@ export default function ListingsMap(props: ListingsMapProps) {
     if (!target) return;
 
     if (compact) {
-      // Schmale Karte (Mobil): Karte liegt fest unten mittig – den Punkt darüber zentrieren
-      map.easeTo({ center: [target.lng, target.lat], offset: [0, -(selectedMarker ? COMPACT_CARD_SHIFT : COMPACT_GROUP_SHIFT)] });
-      return;
+      // Schmale Karte (Mobil): Die Objektkarte liegt fest unten. Den Punkt in die Mitte des freien
+      // Bereichs zwischen sichtbarem Kartenrand oben und Oberkante der Objektkarte schieben –
+      // gemessen statt fest verschoben, damit es bei jeder Bildschirmhöhe passt.
+      const frame = requestAnimationFrame(() => {
+        const canvas = map.getCanvas().getBoundingClientRect();
+        // Auf kleinen Bildschirmen liegt über der Karte noch Suchleiste & Co. – die Seite so weit
+        // scrollen, dass die Karte oben beginnt und über der Objektkarte genug Platz bleibt
+        // …aber nie so weit, dass unter der Karte der Footer hereinrutscht
+        const scrollBy = Math.max(0, Math.min(canvas.top, canvas.bottom - window.innerHeight));
+        if (scrollBy > 0) window.scrollBy({ top: scrollBy, behavior: "smooth" });
+        const canvasTop = canvas.top - scrollBy;
+
+        const cardTop = compactCardRef.current?.getBoundingClientRect().top ?? canvas.bottom;
+        const freeTop = Math.max(canvasTop, 0) + COMPACT_TOP_INSET;
+        const targetY = freeTop + Math.max(0, cardTop - freeTop) / 2;
+        map.easeTo({ center: [target.lng, target.lat], offset: [0, targetY - (canvasTop + canvas.height / 2)] });
+      });
+      return () => cancelAnimationFrame(frame);
     }
 
     const popup = new Popup({
@@ -375,7 +390,7 @@ export default function ListingsMap(props: ListingsMapProps) {
         (compact ? (
           // Mobil am Bildschirm ausrichten (die Karte ragt dort unten über den Viewport), über dem Liste/Karte-Umschalter
           <div className="pointer-events-none fixed inset-x-0 bottom-[84px] z-40 flex justify-center px-4 lg:absolute lg:bottom-16 lg:z-10 lg:px-3">
-            <div className="pointer-events-auto w-full max-w-[340px] overflow-hidden rounded-2xl shadow-[0_10px_30px_-8px_rgb(0_0_0/0.45)]">
+            <div ref={compactCardRef} className="pointer-events-auto w-full max-w-[340px] overflow-hidden rounded-2xl shadow-[0_10px_30px_-8px_rgb(0_0_0/0.45)]">
               <MapPopupCard marker={selectedMarker} onClose={() => props.onSelect(null)} compact className="w-full" />
             </div>
           </div>
@@ -385,7 +400,7 @@ export default function ListingsMap(props: ListingsMapProps) {
       {showGroup &&
         (compact ? (
           <div className="pointer-events-none fixed inset-x-0 bottom-[84px] z-40 flex justify-center px-4 lg:absolute lg:bottom-16 lg:z-10 lg:px-3">
-            <div className="pointer-events-auto w-full max-w-[340px] overflow-hidden rounded-2xl shadow-[0_10px_30px_-8px_rgb(0_0_0/0.45)]">
+            <div ref={compactCardRef} className="pointer-events-auto w-full max-w-[340px] overflow-hidden rounded-2xl shadow-[0_10px_30px_-8px_rgb(0_0_0/0.45)]">
               <MapGroupCard
                 markers={groupMarkers}
                 onActiveChange={setGroupActiveId}

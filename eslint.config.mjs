@@ -20,6 +20,7 @@ const eslintConfig = [
       "next-env.d.ts",
       "public/vendor/**",
       "services/**",
+      "supabase/functions/**",
     ],
   },
 ];

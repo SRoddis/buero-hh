@@ -195,6 +195,7 @@ export type Database = {
       }
       properties: {
         Row: {
+          archived_at: string | null
           area_range_max_sqm: number | null
           area_range_min_sqm: number | null
           building_id: string
@@ -206,11 +207,13 @@ export type Database = {
           contact_id: string | null
           created_at: string
           description: string
+          detail_hash: string | null
           expose_pdf_url: string | null
           external_id: string | null
           featured_rank: number | null
           features: string[]
           id: string
+          last_seen_at: string | null
           price_note: string | null
           price_type: Database["public"]["Enums"]["price_type"]
           property_type: Database["public"]["Enums"]["property_type"]
@@ -218,6 +221,7 @@ export type Database = {
           reference_number: string
           slug: string
           source: Database["public"]["Enums"]["record_source"]
+          source_hash: string | null
           status: Database["public"]["Enums"]["property_status"]
           synced_at: string | null
           teaser: string
@@ -225,6 +229,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           area_range_max_sqm?: number | null
           area_range_min_sqm?: number | null
           building_id: string
@@ -236,11 +241,13 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           description?: string
+          detail_hash?: string | null
           expose_pdf_url?: string | null
           external_id?: string | null
           featured_rank?: number | null
           features?: string[]
           id?: string
+          last_seen_at?: string | null
           price_note?: string | null
           price_type?: Database["public"]["Enums"]["price_type"]
           property_type: Database["public"]["Enums"]["property_type"]
@@ -248,6 +255,7 @@ export type Database = {
           reference_number: string
           slug: string
           source?: Database["public"]["Enums"]["record_source"]
+          source_hash?: string | null
           status?: Database["public"]["Enums"]["property_status"]
           synced_at?: string | null
           teaser?: string
@@ -255,6 +263,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           area_range_max_sqm?: number | null
           area_range_min_sqm?: number | null
           building_id?: string
@@ -266,11 +275,13 @@ export type Database = {
           contact_id?: string | null
           created_at?: string
           description?: string
+          detail_hash?: string | null
           expose_pdf_url?: string | null
           external_id?: string | null
           featured_rank?: number | null
           features?: string[]
           id?: string
+          last_seen_at?: string | null
           price_note?: string | null
           price_type?: Database["public"]["Enums"]["price_type"]
           property_type?: Database["public"]["Enums"]["property_type"]
@@ -278,6 +289,7 @@ export type Database = {
           reference_number?: string
           slug?: string
           source?: Database["public"]["Enums"]["record_source"]
+          source_hash?: string | null
           status?: Database["public"]["Enums"]["property_status"]
           synced_at?: string | null
           teaser?: string
@@ -304,41 +316,62 @@ export type Database = {
       property_images: {
         Row: {
           alt: string
+          attempts: number
           checksum: string | null
           created_at: string
           external_id: string | null
           id: string
+          last_error: string | null
+          processed_at: string | null
           property_id: string
           sort_order: number
           source: Database["public"]["Enums"]["record_source"]
+          source_url: string | null
+          status: string
           storage_path: string | null
+          storage_paths: string[]
           synced_at: string | null
+          thumb_url: string | null
           url: string
         }
         Insert: {
           alt?: string
+          attempts?: number
           checksum?: string | null
           created_at?: string
           external_id?: string | null
           id?: string
+          last_error?: string | null
+          processed_at?: string | null
           property_id: string
           sort_order?: number
           source?: Database["public"]["Enums"]["record_source"]
+          source_url?: string | null
+          status?: string
           storage_path?: string | null
+          storage_paths?: string[]
           synced_at?: string | null
+          thumb_url?: string | null
           url: string
         }
         Update: {
           alt?: string
+          attempts?: number
           checksum?: string | null
           created_at?: string
           external_id?: string | null
           id?: string
+          last_error?: string | null
+          processed_at?: string | null
           property_id?: string
           sort_order?: number
           source?: Database["public"]["Enums"]["record_source"]
+          source_url?: string | null
+          status?: string
           storage_path?: string | null
+          storage_paths?: string[]
           synced_at?: string | null
+          thumb_url?: string | null
           url?: string
         }
         Relationships: [
@@ -438,6 +471,7 @@ export type Database = {
           error: string | null
           finished_at: string | null
           id: string
+          mode: string | null
           source: Database["public"]["Enums"]["record_source"]
           started_at: string
           stats: Json
@@ -448,6 +482,7 @@ export type Database = {
           error?: string | null
           finished_at?: string | null
           id?: string
+          mode?: string | null
           source?: Database["public"]["Enums"]["record_source"]
           started_at?: string
           stats?: Json
@@ -458,6 +493,7 @@ export type Database = {
           error?: string | null
           finished_at?: string | null
           id?: string
+          mode?: string | null
           source?: Database["public"]["Enums"]["record_source"]
           started_at?: string
           stats?: Json
@@ -521,6 +557,7 @@ export type Database = {
       }
     }
     Functions: {
+      invoke_buerohamburg_sync: { Args: { mode: string }; Returns: number }
       search_properties: {
         Args: {
           p_area_max?: number

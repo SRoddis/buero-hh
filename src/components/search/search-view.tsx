@@ -115,7 +115,7 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
           <div
             className={cn(
               "relative overflow-hidden",
-              view === "liste" ? "h-full" : "h-[70dvh] rounded-xl border shadow-sm lg:h-full",
+              view === "liste" ? "h-full" : "h-[calc(100dvh-4.5rem)] rounded-xl border shadow-sm lg:h-full",
             )}
           >
             <ListingsMap
