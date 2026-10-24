@@ -409,6 +409,12 @@ export default function ListingsMap(props: ListingsMapProps) {
     pinRef.current.setLngLat([activeMarker.lng, activeMarker.lat]).addTo(map);
   }, [ready, activeMarker, pinNode]);
 
+  // Wird ein einzelnes Objekt ausgewählt, eine noch offene Gruppe verwerfen – sonst taucht sie nach dem
+  // Schließen des neuen Popups wieder auf und die Karte springt zurück (muss vor dem Popup-Effekt stehen)
+  useEffect(() => {
+    if (selectedId) setGroup(null);
+  }, [selectedId]);
+
   // Popup für das ausgewählte Objekt
   useEffect(() => {
     const map = mapRef.current;

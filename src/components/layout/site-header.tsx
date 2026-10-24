@@ -97,10 +97,13 @@ function MerklisteLink({ count, active, compact }: { count: number; active: bool
       href="/merkliste"
       className={cn(
         "relative flex items-center gap-2 rounded-lg px-3 py-2 text-[0.95rem] text-white/90 hover:text-white",
-        active && "font-semibold text-white",
-        compact && "px-2",
+        // gleiche Markierung wie die übrigen Menüpunkte (weißer Strich unter dem aktiven Eintrag)
+        active &&
+          "font-semibold text-white after:absolute after:inset-x-3 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-white",
+        compact && "px-2 after:inset-x-2",
       )}
       aria-label={`Merkliste (${count} Objekte)`}
+      aria-current={active ? "page" : undefined}
     >
       {!compact && <span>Merkliste</span>}
       <span className="relative">
