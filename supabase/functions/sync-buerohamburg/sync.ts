@@ -44,13 +44,21 @@ interface Stats {
   restored: number;
   purged: number;
   failed: number;
+  /** Objektnummern, deren Details nicht abrufbar waren (werden im nächsten Lauf erneut versucht) */
+  failedRefs: string[];
   imagesQueued: number;
   skippedArchive?: string;
 }
 
 export async function runSync(db: SupabaseClient) {
-  // Kein zweiter Lauf parallel
+  // Kein zweiter Lauf parallel; abgebrochene Läufe (z. B. Ressourcen-Limit) als fehlgeschlagen markieren
   const since = new Date(Date.now() - STALE_RUN_MINUTES * 60_000).toISOString();
+  await db
+    .from("sync_runs")
+    .update({ status: "failed", finished_at: new Date().toISOString(), error: "Abgebrochen (kein Abschluss innerhalb von " + STALE_RUN_MINUTES + " Minuten)" })
+    .eq("mode", "sync")
+    .eq("status", "running")
+    .lt("started_at", since);
   const { data: running } = await db
     .from("sync_runs")
     .select("id")
@@ -69,7 +77,7 @@ export async function runSync(db: SupabaseClient) {
 
   const stats: Stats = {
     listed: 0, created: 0, updated: 0, unchanged: 0, rechecked: 0,
-    archived: 0, restored: 0, purged: 0, failed: 0, imagesQueued: 0,
+    archived: 0, restored: 0, purged: 0, failed: 0, failedRefs: [], imagesQueued: 0,
   };
 
   try {
@@ -98,7 +106,10 @@ export async function runSync(db: SupabaseClient) {
     await mapLimit(toUpdate, CONCURRENCY, async ({ ref, hash }) => {
       const previous = byRef.get(ref);
       const ok = await importObject(db, ref, hash, previous, stats);
-      if (!ok) stats.failed++;
+      if (!ok) {
+        stats.failed++;
+        stats.failedRefs.push(ref);
+      }
       else if (!previous) stats.created++;
       else if (previous.status !== "published") stats.restored++;
       else stats.updated++;
@@ -120,7 +131,10 @@ export async function runSync(db: SupabaseClient) {
     await mapLimit(rolling, CONCURRENCY, async (p) => {
       const ok = await importObject(db, p.reference_number, p.source_hash, byRef.get(p.reference_number), stats, true);
       if (ok) stats.rechecked++;
-      else stats.failed++;
+      else {
+        stats.failed++;
+        stats.failedRefs.push(p.reference_number);
+      }
     });
 
     // 4) „Zuletzt gesehen“ für alle gelisteten Objekte

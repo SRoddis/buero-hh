@@ -70,6 +70,13 @@ const FOCUS_ZOOM = 15;
 /** Clustering – auch für die Berechnung, ab welcher Zoomstufe sich ein Objekt aus seinem Cluster löst */
 const CLUSTER_RADIUS = 46;
 const CLUSTER_MAX_ZOOM = 18;
+/**
+ * Sichtbarer Mindestabstand (px) zum nächsten anderen Ort nach „Auf der Karte anzeigen“: der Preis-Pin
+ * (~90 px breit) soll frei stehen, Nachbarkreise liegen klar daneben statt dahinter.
+ */
+const FOCUS_SEPARATION_PX = 110;
+/** Höchste Zoomstufe beim Anfliegen – Straße und Umgebung sollen erkennbar bleiben */
+const FOCUS_MAX_ZOOM = 17;
 
 /**
  * Zoomstufe, auf der das Objekt nicht mehr mit Nachbarn zu einem Kreis verschmilzt (mind. FOCUS_ZOOM).
@@ -87,8 +94,9 @@ function separationZoom(target: MapMarker, markers: MapMarker[]) {
   }
   if (!Number.isFinite(nearest)) return FOCUS_ZOOM;
   // Meter pro Pixel bei Zoom z (512-px-Kacheln): 40075016.686 · cos(lat) / (512 · 2^z)
-  const needed = Math.log2((40_075_016.686 * Math.cos(target.lat * toRad) * CLUSTER_RADIUS) / (512 * nearest)) + 0.6;
-  return Math.min(CLUSTER_MAX_ZOOM, Math.max(FOCUS_ZOOM, needed));
+  const separationPx = Math.max(CLUSTER_RADIUS, FOCUS_SEPARATION_PX);
+  const needed = Math.log2((40_075_016.686 * Math.cos(target.lat * toRad) * separationPx) / (512 * nearest)) + 0.3;
+  return Math.min(FOCUS_MAX_ZOOM, Math.max(FOCUS_ZOOM, needed));
 }
 /** Verschiebung (px) nach unten beim Anfliegen auf dem Desktop – Platz für das Popup über dem Pin */
 const FOCUS_POPUP_SHIFT = 150;
