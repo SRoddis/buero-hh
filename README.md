@@ -11,7 +11,7 @@ npm install          # kopiert auch den MapLibre-Worker nach public/vendor/
 npm run dev          # http://localhost:3000 → /immobilien
 ```
 
-Ohne Supabase-Konfiguration läuft die App im Mock-Modus mit **160 echten Objekten** von buerohamburg.de (`src/lib/data/mock/fixture.json`). Mit Supabase stehen alle **1.165 Objekte** zur Verfügung.
+Ohne Supabase-Konfiguration läuft die App im Mock-Modus mit **160 echten Objekten** von buerohamburg.de (`src/lib/data/mock/fixture.json`). Mit Supabase steht der vollständige Bestand (rund 1.170 Objekte) zur Verfügung.
 
 | Script | Zweck |
 | --- | --- |
@@ -94,7 +94,7 @@ npm run db:seed:generate       # → supabase/seed/*.sql (alle Objekte) und src/
 npm run db:seed:linked         # Seed-Pakete einspielen (idempotent, kann wiederholt werden)
 ```
 
-- Quelle: `/api/objects/search` (Liste), `/api/objects/<nr>` (Details), Bilder `/objects/images/<nr>/NN_webBig.jpg`, Exposé `/objects/pdf/BHI_<nr>.pdf`
+- Quelle: `/api/objects/search` (Liste), `/api/objects/<nr>` (Details), Bilder `/objects/images/<nr>/NN_webBig.jpg`, Exposé `/objects/pdf/BHI_<nr>.pdf` – Details siehe [buerohamburg.de-API](#buerohamburgde-api)
 - Die Feldzuordnung steckt in `supabase/functions/_shared/buerohamburg.ts` (gemeinsam mit dem Sync; Zuordnung FileMaker → App, z. B. `web_suchKrit01–08` → Ausstattungsmerkmale, Courtage-Codes `bc`/`no` = courtagefrei)
 - Gleiche Adressen werden zu einem Gebäude zusammengefasst; Schlüssel ist die Objektnummer (`source = 'filemaker'`, `external_id`)
 - Danach übernimmt der laufende Abgleich (siehe unten) – der Seed ist nur für die Ersteinrichtung nötig
@@ -146,6 +146,82 @@ Prüfen: `select * from sync_runs order by started_at desc;` und `select status,
 Die View `property_listings` aggregiert Flächen, Preise, Merkmale, Bilder und Kontakt je Objekt; die RPC `search_properties(...)` filtert (inkl. PostGIS-Bounding-Box), Sortierung und Paginierung laufen über PostgREST. RLS gibt nur veröffentlichte Objekte frei; Schreibzugriffe erfolgen ausschließlich über den Service-Role-Key des Sync-Services.
 
 Migration, Seed und Suchfunktion wurden gegen PostgreSQL + PostGIS getestet; die SQL-Suche liefert dieselben Treffer wie die In-Memory-Suche der Mock-Daten.
+
+## buerohamburg.de-API
+
+Inoffizielle JSON-API, die die bestehende Website selbst nutzt. Sie ist nicht dokumentiert und kann sich ohne Ankündigung ändern; dahinter liegt das FileMaker-System (Feldnamen `webs_…`). Kein Login, keine Keys. Genutzt von `scripts/scrape-buerohamburg.ts` und der Edge Function `sync-buerohamburg`; URLs und Feldzuordnung zentral in `supabase/functions/_shared/buerohamburg.ts`.
+
+Basis-URL: `https://www.buerohamburg.de` (Stand der Felder: Oktober 2026)
+
+### Endpunkte
+
+| Methode | Pfad | Antwort |
+| --- | --- | --- |
+| GET | `/api/objects/search?lage=…&objektart=…` | `{ total, items: [...] }` – alle passenden Objekte auf einmal, keine Seitenaufteilung |
+| GET | `/api/objects/<objektnr>` | ein Objekt mit allen Feldern, unbekannte Nummer → `404` |
+| GET/HEAD | `/objects/images/<objektnr>/<NN>_webBig.jpg` | Bild als JPEG, `NN` = `01` … `19` |
+| GET/HEAD | `/objects/pdf/BHI_<objektnr>.pdf` | Exposé-PDF |
+| – | `/objekt.php?objekt=<objektnr>` | Detailseite der alten Website (HTML) |
+
+**Suche – Parameter** (mehrfach angeben = ODER-Verknüpfung):
+
+- `lage` (Pflicht): `HH-City`, `HH-City-Süd`, `HH-Alster`, `HH-West`, `HH-Nord`, `HH-Ost`, `HH-Süd`. Ohne `lage` liefert die API keine Treffer.
+- `objektart` (optional): `Büro`, `Laden`. Unbekannte Werte (z. B. `Halle`) → `400`. Gemischte Objekte mit Halle/Lager-Anteil kommen über `Büro` mit; **reine** Hallen/Lager- und Gastro-Objekte nur ohne `objektart`.
+- Scraper und Sync fragen deshalb alle sieben Lagen **ohne** `objektart` ab = Gesamtbestand (1.172 Objekte, Stand 25.10.2026; mit `objektart=Büro&objektart=Laden` wären es nur 1.165).
+
+```bash
+curl 'https://www.buerohamburg.de/api/objects/search?lage=HH-Nord&lage=HH-Alster&lage=HH-West&lage=HH-City&lage=HH-City-S%C3%BCd&lage=HH-Ost&lage=HH-S%C3%BCd'
+curl 'https://www.buerohamburg.de/api/objects/946'
+```
+
+### Felder
+
+Die Liste liefert eine Teilmenge der Felder, die Details liefern alle. Werte kommen teils als Zahl, teils als Text mit deutschem Zahlenformat.
+
+| Feld | Liste | Bedeutung | Beispiel | → App |
+| --- | :---: | --- | --- | --- |
+| `webs_objektnr` | ✓ | Objektnummer, eindeutiger Schlüssel | `"946"` | `external_id`, URL-Slug |
+| `webs_objekttitel` | ✓ | Titel | | `title` |
+| `webs_objektart` | – | Objektart(en), bei gemischten Objekten zeilenweise: `Büro/Praxis`, `Laden`, `Gastro`, `Halle/Lager/Prod.` | `"Büro/Praxis"` | `categories` |
+| `webs_lage` | ✓ | Marktgebiet (siehe `lage`) | `"HH-Nord"` | `market_area` |
+| `webs_stadtteil` | ✓ | Stadtteil | `"Groß Borstel"` | `district` |
+| `webs_strasse` | ✓ | Straße | `"Papenreye"` | |
+| `webs_hausnummer` | – | Hausnummer, auch Bereiche | `"51-65"` | Gebäudeschlüssel (Straße + Nr. + PLZ) |
+| `webs_plz`, `webs_ort` | ✓ | PLZ, Ort | `"22453"`, `"Hamburg"` | |
+| `webs_lat`, `webs_lng` | ✓ | Koordinaten als Text, leer/`0` = unbekannt | `"53.6137723"` | `location` |
+| `webs_mietflaeche` | ✓ | Fläche in m² (Zahl) | `15` | `area` |
+| `webs_mietflaeche_von` / `_bis` | ✓ | teilbare Fläche als Text | `"ab ca. 15 qm"` | `area_range_min/max` |
+| `webs_mietFormel` | ✓ | Miete je m² (Zahl) | `23.33` | `rent_per_sqm` |
+| `webs_miete` | ✓ | Miete als Text; je nach `webs_preisart` pro m² oder pro Monat | `"350"` | `rent_total_monthly` (bei `Monat`) |
+| `webs_preisart` | ✓ | `qm` oder `Monat` | `"Monat"` | `price_type` |
+| `webs_mwst` | ✓ | Nebenkosten-/MwSt.-Hinweis | `"inkl. NK, zzgl. MwSt."` | `price_note` |
+| `webs_court_text` | ✓ | Courtage-Code: `bc` = courtagefrei, `no` = courtagefrei bei fester Laufzeit, Zahl = Monatsmieten | `"bc"` | `commission_free`, Merkmal „Provisionsfrei“ |
+| `webs_court` | ✓ | Courtage als Satz | | `commission_note` |
+| `webs_beschreibung` | ✓ | Beschreibung – in der Liste auf 300 Zeichen gekürzt (`…`), vollständig nur in den Details | | `description` |
+| `webs_home` | – | Rang für „Top-Objekte“ auf der Startseite, leer = keins | `""` | `featured_rank` |
+| `webs_suchbegriffe` | – | interne Suchkennungen, Bedeutung unklar, ungenutzt | `"   1   1 "` | – |
+| `web_suchKrit01` … `08` | teils | Merkmale, `1` = ja, `""` = nein (siehe unten). `03` und `06` fehlen in der Liste | `1` | `features` |
+| `recordId` | – | interne FileMaker-Datensatz-ID; ändert sich, darum vom Hash ausgenommen | `"3440117053"` | – |
+
+Merkmale (`web_suchKrit…`):
+
+| Feld | Merkmal | Feld | Merkmal |
+| --- | --- | --- | --- |
+| `01` | Balkon / Terrasse | `05` | Erdgeschossfläche |
+| `02` | Barrierefrei | `06` | Neubau |
+| `03` | Personenaufzug | `07` | Hauseigene Parkplätze |
+| `04` | Lastenaufzug | `08` | Wasserblick |
+
+### Bilder und Exposé
+
+- Bilder sind fortlaufend nummeriert (`01_webBig.jpg`, `02_webBig.jpg`, …). Eine Bildliste gibt es nicht; wie die Website prüfen wir per `HEAD` bis zur ersten Lücke (höchstens 19).
+- Das Exposé gibt es nicht zu jedem Objekt. Ob es existiert, erkennt man am `Content-Type: application/pdf` (Antwort per `HEAD`).
+
+### Besonderheiten
+
+- **Sporadische 404:** Unter Last antwortet die API gelegentlich mit `404`, obwohl das Objekt existiert. Scraper und Sync wiederholen deshalb auch `404`/`429` bis zu fünfmal mit wachsender Pause; einzelne Abrufe können trotzdem scheitern (`sync_runs.failed`) und klappen beim nächsten Lauf.
+- **Schonend abfragen:** höchstens 2–3 parallele Anfragen. Der Sync lädt Details nur für neue/geänderte Objekte (Hash über den Listeneintrag) und prüft reihum 60 Objekte je Lauf vollständig.
+- **Gleiche Adresse, mehrere Angebote:** Jede Fläche ist ein eigenes Objekt; wir fassen sie über Straße, Hausnummer und PLZ zu einem Gebäude zusammen.
 
 ## FileMaker-Integration (vorbereitet)
 

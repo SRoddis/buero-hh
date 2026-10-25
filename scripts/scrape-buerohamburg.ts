@@ -19,8 +19,9 @@ import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } 
 import { join } from "node:path";
 
 const BASE = "https://www.buerohamburg.de";
+/** Ohne objektart-Filter – der kennt nur Büro/Laden und blendet reine Hallen- und Gastro-Objekte aus */
 const SEARCH_QUERY =
-  "objektart=B%C3%BCro&objektart=Laden&lage=HH-Nord&lage=HH-Alster&lage=HH-West&lage=HH-City&lage=HH-City-S%C3%BCd&lage=HH-Ost&lage=HH-S%C3%BCd";
+  "lage=HH-Nord&lage=HH-Alster&lage=HH-West&lage=HH-City&lage=HH-City-S%C3%BCd&lage=HH-Ost&lage=HH-S%C3%BCd";
 const USER_AGENT = "BueroHamburg-Datenmigration/1.0 (+https://www.buerohamburg.de)";
 const MAX_IMAGES = 19;
 const CONCURRENCY = 2;

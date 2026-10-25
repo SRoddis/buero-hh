@@ -1,6 +1,8 @@
 import { BADGE_FEATURES, FEATURES, PROPERTY_CATEGORIES, type FeatureKey, type PropertyCategory } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
+import { FEATURE_ICONS } from "./feature-icons";
+
 const FEATURE_BADGE_STYLES: Partial<Record<FeatureKey, string>> = {
   provisionsfrei: "bg-emerald-100 text-emerald-800",
   neubau: "bg-rose-100 text-rose-800",
@@ -29,11 +31,15 @@ export function ListingBadges({
           {PROPERTY_CATEGORIES.find((c) => c.value === category)?.short}
         </Pill>
       ))}
-      {highlighted.map((feature) => (
-        <Pill key={feature} className={FEATURE_BADGE_STYLES[feature]}>
-          {FEATURES[feature]}
-        </Pill>
-      ))}
+      {highlighted.map((feature) => {
+        const Icon = FEATURE_ICONS[feature];
+        return (
+          <Pill key={feature} className={cn("inline-flex items-center gap-1", FEATURE_BADGE_STYLES[feature])}>
+            <Icon className="size-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+            {FEATURES[feature]}
+          </Pill>
+        );
+      })}
     </div>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { Check, LoaderCircle, Search, X } from "lucide-react";
+import { Check, LoaderCircle, Search, X, type LucideIcon } from "lucide-react";
 
 import { CategoryDot } from "@/components/listing/category-dot";
+import { FEATURE_ICONS } from "@/components/listing/feature-icons";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { FEATURE_KEYS, FEATURES, MARKET_AREAS, PROPERTY_CATEGORIES } from "@/lib/constants";
 import { formatNumber } from "@/lib/format";
@@ -97,6 +98,7 @@ export function MobileSearchSheet({ trigger, total }: { trigger: React.ReactNode
                   key={feature}
                   active={filters.features.includes(feature)}
                   onClick={() => update({ features: toggleValue(filters.features, feature) })}
+                  icon={FEATURE_ICONS[feature]}
                 >
                   {FEATURES[feature]}
                 </Pill>
@@ -138,7 +140,17 @@ function PillGroup({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-wrap gap-2">{children}</div>;
 }
 
-function Pill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function Pill({
+  active,
+  onClick,
+  icon: Icon,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon?: LucideIcon;
+  children: React.ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -151,7 +163,7 @@ function Pill({ active, onClick, children }: { active: boolean; onClick: () => v
           : "border-border bg-white hover:border-foreground/30",
       )}
     >
-      {active && <Check className="size-3.5" strokeWidth={3} />}
+      {Icon ? <Icon className="size-4" aria-hidden /> : active && <Check className="size-3.5" strokeWidth={3} />}
       {children}
     </button>
   );

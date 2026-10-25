@@ -6,10 +6,13 @@
 
 export const BH_BASE = "https://www.buerohamburg.de";
 
-/** Liste aller Objekte – ohne objektart/lage-Filter liefert die API nichts, ungültige Werte → 400 */
-export const BH_SEARCH_URL =
-  `${BH_BASE}/api/objects/search?objektart=B%C3%BCro&objektart=Laden&lage=HH-Nord&lage=HH-Alster` +
-  "&lage=HH-West&lage=HH-City&lage=HH-City-S%C3%BCd&lage=HH-Ost&lage=HH-S%C3%BCd";
+/**
+ * Liste aller Objekte – ohne lage-Filter liefert die API nichts, ungültige Werte → 400.
+ * Bewusst ohne objektart: der Filter kennt nur Büro/Laden und blendet reine Hallen- und Gastro-Objekte aus.
+ */
+export const BH_SEARCH_QUERY =
+  "lage=HH-Nord&lage=HH-Alster&lage=HH-West&lage=HH-City&lage=HH-City-S%C3%BCd&lage=HH-Ost&lage=HH-S%C3%BCd";
+export const BH_SEARCH_URL = `${BH_BASE}/api/objects/search?${BH_SEARCH_QUERY}`;
 
 export const bhDetailUrl = (nr: string) => `${BH_BASE}/api/objects/${encodeURIComponent(nr)}`;
 export const bhImageUrl = (nr: string, index: number) =>
@@ -32,6 +35,7 @@ const TYPE_BY_CATEGORY: Record<Category, "buero" | "laden" | "lager"> = {
 const CATEGORY_BY_OBJEKTART: Record<string, Category> = {
   "buero/praxis": "buero-praxis",
   laden: "laden-gastro",
+  gastro: "laden-gastro",
   "halle/lager/prod.": "lager-logistik",
 };
 /** FileMaker-Suchkriterien → Merkmal-Schlüssel des Frontends (src/lib/constants.ts) */

@@ -1,8 +1,9 @@
 "use client";
 
-import { Check, Link2, Search, SlidersHorizontal } from "lucide-react";
+import { Check, Link2, Search, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 
+import { FEATURE_ICONS } from "@/components/listing/feature-icons";
 import { Button } from "@/components/ui/button";
 import { categoryLabel, FEATURES, QUICK_FEATURES } from "@/lib/constants";
 import { countActiveFilters } from "@/lib/search/params";
@@ -102,6 +103,7 @@ function FilterChips({ total }: { total: number }) {
             key={feature}
             active={filters.features.includes(feature)}
             onClick={() => update({ features: toggleValue(filters.features, feature) })}
+            icon={FEATURE_ICONS[feature]}
           >
             {FEATURES[feature]}
           </Chip>
@@ -131,7 +133,17 @@ function FilterChips({ total }: { total: number }) {
   );
 }
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function Chip({
+  active,
+  onClick,
+  icon: Icon,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon?: LucideIcon;
+  children: React.ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -144,7 +156,8 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
           : "border-border bg-secondary/60 text-foreground hover:border-foreground/25 hover:bg-secondary",
       )}
     >
-      {active && <Check className="size-3" strokeWidth={3} />}
+      {/* Mit Icon zeigt die Füllung den aktiven Zustand – das Icon bleibt zur Wiedererkennung stehen */}
+      {Icon ? <Icon className="size-3.5" strokeWidth={2.25} aria-hidden /> : active && <Check className="size-3" strokeWidth={3} />}
       {children}
     </button>
   );
