@@ -7,6 +7,7 @@ import {
   cleanText,
   hashRecord,
   normalize,
+  unknownObjektartenOf,
   type BhRaw,
 } from "../_shared/buerohamburg.ts";
 import { discoverImages, removeStorage } from "./images.ts";
@@ -48,6 +49,8 @@ interface Stats {
   failedRefs: string[];
   imagesQueued: number;
   skippedArchive?: string;
+  /** Unbekannte Objektarten/Lagen – Zuordnung in _shared/buerohamburg.ts ergänzen */
+  warnings: string[];
 }
 
 export async function runSync(db: SupabaseClient) {
@@ -77,7 +80,7 @@ export async function runSync(db: SupabaseClient) {
 
   const stats: Stats = {
     listed: 0, created: 0, updated: 0, unchanged: 0, rechecked: 0,
-    archived: 0, restored: 0, purged: 0, failed: 0, failedRefs: [], imagesQueued: 0,
+    archived: 0, restored: 0, purged: 0, failed: 0, failedRefs: [], imagesQueued: 0, warnings: [],
   };
 
   try {
@@ -210,8 +213,11 @@ async function importObject(
   if (!detail?.webs_objektnr) return false;
 
   const o = normalize(detail);
+  for (const art of unknownObjektartenOf(detail.webs_objektart)) {
+    stats.warnings.push(`Objekt ${ref}: unbekannte Objektart „${art}“ – als ${o.categories.join("/")} eingeordnet`);
+  }
   if (!o.marketArea) {
-    console.warn(`Objekt ${ref}: unbekannte Lage „${detail.webs_lage}“`);
+    stats.warnings.push(`Objekt ${ref}: unbekannte Lage „${cleanText(detail.webs_lage)}“ – nicht übernommen`);
     return false;
   }
   const detailHash = await hashRecord(detail);

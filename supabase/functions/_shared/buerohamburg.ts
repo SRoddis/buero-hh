@@ -85,13 +85,19 @@ export function teaserOf(description: string, max = 180) {
   return `${cut.slice(0, cut.lastIndexOf(" "))} …`;
 }
 
+const objektartParts = (objektart: unknown) => String(objektart ?? "").split(/[\r\n]+/).map(cleanText).filter(Boolean);
+const categoryOfPart = (part: string): Category | undefined =>
+  CATEGORY_BY_OBJEKTART[part.toLowerCase().replace(/ü/g, "ue")];
+
 export function categoriesOf(objektart: unknown): Category[] {
-  const categories = String(objektart ?? "")
-    .split(/[\r\n]+/)
-    .map((part) => CATEGORY_BY_OBJEKTART[cleanText(part).toLowerCase().replace(/ü/g, "ue")])
+  const categories = objektartParts(objektart)
+    .map(categoryOfPart)
     .filter((c): c is Category => Boolean(c));
   return categories.length ? [...new Set(categories)] : ["buero-praxis"];
 }
+
+/** Objektarten ohne Zuordnung (z. B. wenn BüroHamburg eine neue einführt) – der Sync meldet sie als Warnung */
+export const unknownObjektartenOf = (objektart: unknown) => objektartParts(objektart).filter((part) => !categoryOfPart(part));
 
 /** null bei unbekannter Lage (z. B. wenn BüroHamburg eine neue einführt) */
 export function marketAreaOf(lage: unknown): MarketArea | null {

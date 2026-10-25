@@ -111,6 +111,8 @@ Die Edge Function `supabase/functions/sync-buerohamburg` hält Supabase aktuell.
 - **Löschschutz:** Fehlen mehr als 5 % der Objekte in einem Lauf, wird nichts archiviert. Archivierte Objekte verschwinden sofort von der Seite, kommen zurück, falls sie wieder auftauchen, und werden nach 7 Tagen samt Bildern gelöscht.
 - **Bilder** haben inhaltsabhängige Dateinamen (dauerhaft cachebar); bis zur Umwandlung zeigt die Seite das Original von buerohamburg.de.
 - **Protokoll:** jede Ausführung landet mit Zahlen in `sync_runs`.
+- **Neue Objektarten/Lagen:** Kennt die Zuordnung in `_shared/buerohamburg.ts` eine Objektart nicht, wird das Objekt als Büro übernommen; bei unbekannter Lage wird es nicht übernommen. Beides steht als Warnung in `sync_runs.stats->warnings`. Jedes Objekt wird spätestens alle ~3 Stunden geprüft:
+  `select started_at, stats->'warnings' from sync_runs where jsonb_array_length(stats->'warnings') > 0 order by started_at desc;`
 - Die Feldzuordnung (`supabase/functions/_shared/buerohamburg.ts`) nutzen Edge Function und Seed gemeinsam.
 
 **Einrichtung** (einmalig, Supabase Pro wegen des Speicherbedarfs von rund 1,6 GB für Bilder):
