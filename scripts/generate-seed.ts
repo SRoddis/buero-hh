@@ -2,7 +2,6 @@
  * Erzeugt aus den gescrapten Daten (data/scrape/buerohamburg.json, siehe `npm run scrape`):
  *   - supabase/seed/NNN.sql              kompletter Objektbestand für Supabase, in Paketen
  *                                        (die Management-API nimmt nur begrenzt große Abfragen an)
- *   - src/lib/data/mock/fixture.json     repräsentative Auswahl für den Mock-Modus
  *
  * Aufruf: npm run db:seed:generate – einspielen mit: npm run db:seed:linked
  *
@@ -13,11 +12,8 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { Listing } from "../src/lib/types";
-
 import { transform, type ScrapedObject } from "./lib/buerohamburg-transform";
 
-const FIXTURE_SIZE = 160;
 /** Maximale Größe eines Seed-Pakets in Bytes */
 const SEED_CHUNK_BYTES = 300_000;
 const NL = "\n";
@@ -135,28 +131,4 @@ chunks.forEach((chunk, i) => {
   writeFileSync(file, [header, "begin;", ...chunk, "commit;", ""].join(NL + NL));
 });
 
-// ---------------------------------------------------------------------------
-// Mock-Fixture: alle seltenen Kategorien, alle hervorgehobenen Objekte, je Stadtteil
-// mindestens ein Objekt, aufgefüllt mit einer gleichmäßigen Stichprobe
-// ---------------------------------------------------------------------------
-const picked = new Map<string, Listing>();
-const pick = (l: Listing) => picked.size < FIXTURE_SIZE && picked.set(l.id, l);
-listings.filter((l) => l.category !== "buero-praxis" || l.categories.length > 1).forEach(pick);
-listings.filter((l) => l.featuredRank != null).forEach(pick);
-for (const d of districts) {
-  const first = listings.find((l) => l.districtSlug === d.slug && l.lat != null);
-  if (first) pick(first);
-}
-const step = Math.max(1, Math.floor(listings.length / FIXTURE_SIZE));
-for (let i = 0; picked.size < FIXTURE_SIZE && i < listings.length; i += step) pick(listings[i]);
-
-const fixtureListings = [...picked.values()];
-const usedDistricts = new Set(fixtureListings.map((l) => l.districtSlug));
-const fixtureFile = join(process.cwd(), "src", "lib", "data", "mock", "fixture.json");
-writeFileSync(
-  fixtureFile,
-  JSON.stringify({ districts: districts.filter((d) => usedDistricts.has(d.slug)), listings: fixtureListings }),
-);
-
 console.log(`seed/:        ${chunks.length} Pakete, ${listings.length} Objekte, ${buildingsSeen.size} Gebäude, ${districts.length} Stadtteile`);
-console.log(`fixture.json: ${fixtureListings.length} Objekte für den Mock-Modus`);

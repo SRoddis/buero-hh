@@ -11,14 +11,14 @@ npm install          # kopiert auch den MapLibre-Worker nach public/vendor/
 npm run dev          # http://localhost:3000 → /immobilien
 ```
 
-Ohne Supabase-Konfiguration läuft die App im Mock-Modus mit **160 echten Objekten** von buerohamburg.de (`src/lib/data/mock/fixture.json`). Mit Supabase steht der vollständige Bestand (rund 1.170 Objekte) zur Verfügung.
+Die App benötigt Supabase (siehe [Supabase anbinden](#supabase-anbinden)). Fehlt die Konfiguration oder ist die Datenbank nicht erreichbar, zeigt sie eine **Störungsseite** (`src/app/error.tsx`) – bewusst ohne Rückfall auf Testdaten, damit Interessenten keine veralteten Angebote sehen.
 
 | Script | Zweck |
 | --- | --- |
 | `npm run dev` / `build` / `start` | Entwicklung / Produktion |
 | `npm run lint`, `npm run typecheck` | Qualitätsprüfungen |
 | `npm run scrape` | Objektbestand von buerohamburg.de abrufen (`data/scrape/`, siehe unten) |
-| `npm run db:seed:generate` | erzeugt `supabase/seed/*.sql` und die Mock-Daten aus dem Scrape |
+| `npm run db:seed:generate` | erzeugt `supabase/seed/*.sql` aus dem Scrape |
 | `npm run db:seed:linked` | Seed-Pakete ins verknüpfte Supabase-Projekt einspielen |
 | `npm run db:push` | neue Migrationen ins verknüpfte Supabase-Projekt einspielen |
 | `npm run db:types` | TypeScript-Typen aus dem Datenbankschema generieren |
@@ -52,16 +52,16 @@ src/
     layout/ favorites/ ui/  Header/Footer, Merkliste, shadcn/ui
   lib/
     constants.ts types.ts   Fachliche Stammdaten und Domänenmodell
-    search/                 URL-Parameter (parse/serialize) und In-Memory-Filter
-    data/                   Repository-Interface, Mock- und Supabase-Implementierung, Mock-Daten
+    search/                 URL-Parameter (parse/serialize)
+    data/                   Repository-Interface und Supabase-Implementierung
     actions/                Server Actions (Kontaktanfrage)
 supabase/
   migrations/               Schema, View, Suchfunktion, RLS
-  seed.sql                  generiert aus den Mock-Daten
+  seed/                     generiert aus dem Scrape von buerohamburg.de
 services/filemaker-sync/    separater Sync-Service FileMaker → Supabase
 ```
 
-Seiten greifen ausschließlich über `PropertyRepository` (`src/lib/data/repository.ts`) auf Daten zu. Ob Mock-Daten oder Supabase genutzt werden, entscheidet `DATA_SOURCE` bzw. ob Supabase konfiguriert ist.
+Seiten greifen ausschließlich über `PropertyRepository` (`src/lib/data/repository.ts`) auf Daten zu. Einzige Datenquelle ist Supabase; ohne Konfiguration wirft `getRepository()` einen Fehler, und die Störungsseite erscheint.
 
 ## Supabase anbinden
 
@@ -78,7 +78,6 @@ Das Projekt ist mit Supabase Cloud verknüpft (`supabase/config.toml`, CLI als D
    ```
 3. `.env.local` anlegen (Vorlage: `.env.example`; Key unter „Project Settings → API Keys“):
    ```
-   DATA_SOURCE=supabase
    SUPABASE_URL=https://<projekt>.supabase.co
    SUPABASE_PUBLISHABLE_KEY=<publishable key>
    ```
@@ -90,7 +89,7 @@ Bis der FileMaker-Sync läuft, kommt der Objektbestand von der JSON-API, die auc
 
 ```bash
 npm run scrape                 # Objekte, Details, Bild-URLs, PDF-Infos → data/scrape/ (CSV + JSON, nicht im Git)
-npm run db:seed:generate       # → supabase/seed/*.sql (alle Objekte) und src/lib/data/mock/fixture.json
+npm run db:seed:generate       # → supabase/seed/*.sql (alle Objekte)
 npm run db:seed:linked         # Seed-Pakete einspielen (idempotent, kann wiederholt werden)
 ```
 
@@ -147,7 +146,7 @@ Prüfen: `select * from sync_runs order by started_at desc;` und `select status,
 
 Die View `property_listings` aggregiert Flächen, Preise, Merkmale, Bilder und Kontakt je Objekt; die RPC `search_properties(...)` filtert (inkl. PostGIS-Bounding-Box), Sortierung und Paginierung laufen über PostgREST. RLS gibt nur veröffentlichte Objekte frei; Schreibzugriffe erfolgen ausschließlich über den Service-Role-Key des Sync-Services.
 
-Migration, Seed und Suchfunktion wurden gegen PostgreSQL + PostGIS getestet; die SQL-Suche liefert dieselben Treffer wie die In-Memory-Suche der Mock-Daten.
+Migration, Seed und Suchfunktion wurden gegen PostgreSQL + PostGIS getestet.
 
 ## buerohamburg.de-API
 

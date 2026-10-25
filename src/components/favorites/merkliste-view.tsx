@@ -14,6 +14,7 @@ import { useFavorites } from "./favorites-provider";
 export function MerklisteView() {
   const { ids, ready } = useFavorites();
   const [items, setItems] = useState<ListingSummary[] | null>(null);
+  const [failed, setFailed] = useState(false);
   const key = [...ids].sort().join(",");
 
   useEffect(() => {
@@ -24,11 +25,22 @@ export function MerklisteView() {
     }
     const controller = new AbortController();
     fetch(`/api/listings?ids=${encodeURIComponent(key)}`, { signal: controller.signal })
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Merkliste konnte nicht geladen werden (HTTP ${res.status})`);
+        return res.json();
+      })
       .then((data: { items: ListingSummary[] }) => setItems(data.items))
-      .catch(() => {});
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          console.error(error);
+          setFailed(true);
+        }
+      });
     return () => controller.abort();
   }, [key, ready]);
+
+  // an die Fehlergrenze (Störungsseite) weitergeben statt endlos den Ladezustand zu zeigen
+  if (failed) throw new Error("Objektdaten nicht verfügbar");
 
   if (!ready || items === null) {
     return (

@@ -4,6 +4,7 @@ import { ArrowRight, Layers, MapPin, MapPinned, Ruler } from "lucide-react";
 import Link from "next/link";
 import { forwardRef } from "react";
 
+import { CompareCheckbox } from "@/components/compare/compare-checkbox";
 import { FavoriteButton } from "@/components/favorites/favorite-button";
 import { marketAreaLabel } from "@/lib/constants";
 import { formatArea, formatFurtherAreas, formatRentLabel, formatRentPerSqmHint } from "@/lib/format";
@@ -19,12 +20,14 @@ interface ListingCardProps {
   onHoverChange?: (id: string | null) => void;
   /** Zeigt einen Button, der das Objekt auf der Karte anzeigt (nur in der Suche mit Karte) */
   onShowOnMap?: () => void;
+  /** Auswahlkästchen für den Objektvergleich (nur in der Suche) */
+  compare?: boolean;
   priority?: boolean;
   className?: string;
 }
 
 export const ListingCard = forwardRef<HTMLElement, ListingCardProps>(function ListingCard(
-  { listing, highlighted, onHoverChange, onShowOnMap, priority, className },
+  { listing, highlighted, onHoverChange, onShowOnMap, compare, priority, className },
   ref,
 ) {
   const furtherAreas = formatFurtherAreas(listing);
@@ -48,6 +51,7 @@ export const ListingCard = forwardRef<HTMLElement, ListingCardProps>(function Li
         sizes="(min-width: 1536px) 22vw, (min-width: 1024px) 28vw, (min-width: 640px) 50vw, 100vw"
       >
         <ListingBadges categories={listing.categories} features={listing.features} className="absolute bottom-3 left-3" />
+        {compare && <CompareCheckbox listing={listing} className="absolute top-3 left-3 z-10" />}
         <div className="absolute top-3 right-3 z-10 flex gap-2">
           {onShowOnMap && listing.lat != null && (
             <button

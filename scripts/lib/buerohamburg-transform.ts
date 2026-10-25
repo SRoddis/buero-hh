@@ -1,6 +1,6 @@
 /**
  * Überführt die gescrapten Rohdaten von buerohamburg.de (data/scrape/buerohamburg.json)
- * in das Domänenmodell der App. Grundlage für den Seed (Supabase) und die Mock-Daten.
+ * in das Domänenmodell der App. Grundlage für den Seed (Supabase).
  *
  * Die eigentliche Feldzuordnung steckt in supabase/functions/_shared/buerohamburg.ts und wird
  * auch vom laufenden Sync (Edge Function) verwendet – Schlüssel und Werte sind dadurch identisch.

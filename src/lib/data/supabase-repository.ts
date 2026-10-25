@@ -243,6 +243,17 @@ export class SupabasePropertyRepository implements PropertyRepository {
     return (data as unknown as ListingRow[]).map(toSummary);
   }
 
+  async getByReferenceNumbers(referenceNumbers: string[]) {
+    if (!referenceNumbers.length) return [];
+    const { data, error } = await this.db
+      .from("property_listings")
+      .select(SUMMARY_COLUMNS)
+      .in("reference_number", referenceNumbers)
+      .eq("status", "published");
+    if (error) throw error;
+    return (data as unknown as ListingRow[]).map(toSummary);
+  }
+
   async getSimilar(listing: Listing, limit = 3) {
     const { data, error } = await this.db
       .rpc("search_properties", { p_category: listing.category, p_market_area: listing.marketArea })

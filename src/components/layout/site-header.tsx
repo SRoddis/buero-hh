@@ -26,7 +26,7 @@ export function SiteHeader() {
   const isActive = (href: string) => href.startsWith("/") && pathname.startsWith(href);
 
   return (
-    <header className="bg-brand text-white">
+    <header className="bg-brand text-white print:hidden">
       <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-6 px-4 sm:px-6 lg:h-16 lg:px-8">
         <Logo />
 

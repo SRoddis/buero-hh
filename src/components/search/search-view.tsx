@@ -3,6 +3,9 @@
 import { ChevronLeft, ChevronRight, List, Map as MapIcon, SearchX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { CompareBar } from "@/components/compare/compare-bar";
+import { useCompare } from "@/components/compare/compare-provider";
+import { restoreSearchPosition } from "@/components/compare/search-return";
 import { ListingCard } from "@/components/listing/listing-card";
 import { ListingsMap } from "@/components/map/listings-map-lazy";
 import { Button } from "@/components/ui/button";
@@ -32,6 +35,7 @@ const CARD_COLUMNS = "sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(340px
  */
 export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: string }) {
   const { filters, update, reset, isPending } = useSearch();
+  const comparing = useCompare().items.length > 0;
   const [view, setView] = useState<ResultsView>("liste");
   const [mapSize, setMapSize] = useState<MapSize>(1);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -86,6 +90,9 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
 
   const listRef = useRef<HTMLElement>(null);
 
+  // Rückkehr aus dem Objektvergleich: an die vorherige Stelle der Liste springen
+  useEffect(restoreSearchPosition, []);
+
   const changePage = (page: number) => {
     update({ page });
     // Desktop: Liste scrollt in ihrer eigenen Spalte · Mobil: ganze Seite
@@ -120,6 +127,8 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
             "min-w-0 px-4 pb-24 sm:px-6 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:pb-6 lg:pl-8",
             mapSize === 0 ? "lg:pr-8" : "lg:pr-2",
             view === "karte" && "hidden lg:hidden",
+            // Platz für die Vergleichsleiste
+            comparing && "pb-40 lg:pb-28",
           )}
         >
           <div className="space-y-5">
@@ -141,6 +150,7 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
                     highlighted={listing.id === hoveredId || listing.id === selectedId}
                     onHoverChange={setHoveredId}
                     onShowOnMap={() => showOnMap(listing.id)}
+                    compare
                   />
                 ))}
               </div>
@@ -194,8 +204,17 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
         </button>
       )}
 
+      {/* mobil nur in der Listenansicht – in der Kartenansicht liegt dort die Objektkarte */}
+      <CompareBar className={view === "karte" ? "max-lg:hidden" : undefined} />
+
       {/* Mobil: Umschalter zwischen Liste und Karte */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-5 z-30 flex justify-center lg:hidden">
+      <div
+        className={cn(
+          "pointer-events-none fixed inset-x-0 z-30 flex justify-center transition-[bottom] duration-300 ease-out lg:hidden",
+          // über der Vergleichsleiste, die mobil nur in der Listenansicht erscheint
+          comparing && view === "liste" ? "bottom-[92px]" : "bottom-5",
+        )}
+      >
         <Button
           size="lg"
           className="pointer-events-auto h-12 gap-2 rounded-full px-6 text-[0.95rem] shadow-xl"

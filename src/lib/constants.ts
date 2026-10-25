@@ -78,6 +78,9 @@ export type SortKey = (typeof SORT_OPTIONS)[number]["value"];
 
 export const PAGE_SIZE = 12;
 
+/** Höchstzahl der Objekte im Objektvergleich */
+export const MAX_COMPARE = 3;
+
 export const HAMBURG_CENTER: [number, number] = [9.9937, 53.5511];
 
 export const CATEGORY_COLORS: Record<PropertyCategory, string> = {
