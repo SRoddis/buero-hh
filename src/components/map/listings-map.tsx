@@ -105,8 +105,6 @@ const FOCUS_POPUP_SHIFT = 150;
 const COMPACT_TOP_INSET = 16;
 /** Verschiebung (px) beim Öffnen einer Gruppenliste auf dem Desktop */
 const GROUP_LIST_SHIFT = 150;
-/** Halbe Kantenlänge (Grad, ≈ 20 m) des Ausschnitts für „Alle Angebote anzeigen“ */
-const GROUP_BBOX_DEGREES = 0.0002;
 
 /** Trefferfläche um einen Punkt (px) – deckt auch den darüberliegenden Preis-Pin ab */
 const HIT_PADDING: [number, number] = [26, 12];
@@ -170,13 +168,6 @@ export default function ListingsMap(props: ListingsMapProps) {
   const showGroup = !selectedMarker && groupMarkers.length > 1;
 
   const closeGroup = () => setGroup(null);
-  /** „Alle anzeigen“: Trefferliste per eng gefasstem Kartenausschnitt auf diesen Ort beschränken */
-  const showGroupInList = () => {
-    if (!group) return;
-    const d = GROUP_BBOX_DEGREES;
-    props.onBboxChange([group.lng - d, group.lat - d, group.lng + d, group.lat + d]);
-    setGroup(null);
-  };
 
   // Karte einmalig initialisieren
   useEffect(() => {
@@ -545,7 +536,6 @@ export default function ListingsMap(props: ListingsMapProps) {
                 initialId={group?.initialId}
                 onActiveChange={setGroupActiveId}
                 onClose={closeGroup}
-                onShowAll={showGroupInList}
                 compact
                 className="w-full"
               />
@@ -558,7 +548,6 @@ export default function ListingsMap(props: ListingsMapProps) {
               initialId={group?.initialId}
               onActiveChange={setGroupActiveId}
               onClose={closeGroup}
-              onShowAll={showGroupInList}
             />,
             popupNode,
           )

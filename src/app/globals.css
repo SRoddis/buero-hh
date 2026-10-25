@@ -141,3 +141,25 @@
 .maplibregl-marker {
   z-index: 2;
 }
+
+/* Bildwechsler (Liste, Kartenpopup): Bilder gleiten seitlich, „weiter“ von rechts nach links */
+@keyframes carousel-in-next {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes carousel-out-next {
+  to {
+    transform: translateX(-100%);
+  }
+}
+@keyframes carousel-in-prev {
+  from {
+    transform: translateX(-100%);
+  }
+}
+@keyframes carousel-out-prev {
+  to {
+    transform: translateX(100%);
+  }
+}

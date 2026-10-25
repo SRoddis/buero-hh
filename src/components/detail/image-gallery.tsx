@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Images } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { ListingImage } from "@/components/listing/listing-image";
+import { SlideTransition } from "@/components/listing/slide-transition";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import type { PropertyImage } from "@/lib/types";
 import { useSwipe } from "@/hooks/use-swipe";
@@ -11,16 +12,16 @@ import { cn } from "@/lib/utils";
 
 export function ImageGallery({ images, title }: { images: PropertyImage[]; title: string }) {
   const [open, setOpen] = useState(false);
-  const [index, setIndex] = useState(0);
+  const [{ index, dir }, setNav] = useState<{ index: number; dir: 1 | -1 }>({ index: 0, dir: 1 });
+  const wrap = useCallback((i: number) => (i + images.length) % images.length, [images.length]);
+  /** Bild direkt wählen (Vorschaubild) – Richtung der Animation ergibt sich aus der Position */
+  const setIndex = (i: number) => setNav((n) => ({ index: i, dir: i < n.index ? -1 : 1 }));
 
   const show = (i: number) => {
     setIndex(i);
     setOpen(true);
   };
-  const step = useCallback(
-    (delta: number) => setIndex((i) => (i + delta + images.length) % images.length),
-    [images.length],
-  );
+  const step = useCallback((delta: 1 | -1) => setNav((n) => ({ index: wrap(n.index + delta), dir: delta })), [wrap]);
   const swipe = useSwipe({ onNext: () => step(1), onPrevious: () => step(-1) });
 
   useEffect(() => {
@@ -76,15 +77,25 @@ export function ImageGallery({ images, title }: { images: PropertyImage[]; title
         {/* flex statt grid: Bei grid wächst die Spalte mit der Vorschauleiste über die Dialogbreite hinaus */}
         <DialogContent className="flex max-h-[calc(100dvh-2rem)] max-w-[min(1200px,96vw)] flex-col gap-0 overflow-hidden border-0 bg-black p-0 text-white sm:max-w-[min(1200px,96vw)]">
           <DialogTitle className="sr-only">Bildergalerie: {title}</DialogTitle>
-          {/* Bildhöhe an das Fenster anpassen: höchstens 3:2 der Breite, aber immer Platz für Unterschrift und Vorschaubilder */}
-          <div className="relative h-[min(calc(100dvh-9.5rem),calc(min(1200px,96vw)*0.6667))] w-full shrink-0" {...swipe}>
-            <ListingImage
-              key={images[index]?.id}
-              src={images[index]?.url}
-              alt={images[index]?.alt ?? title}
-              fill
-              sizes="96vw"
-              className="object-contain"
+          {/* Kopfleiste: Abstand nach oben und Platz für den Schließen-Button, damit das Bild nicht am Rand klebt */}
+          <div className="h-12 shrink-0" />
+          {/* Bildhöhe an das Fenster anpassen: höchstens 3:2 der Breite, aber immer Platz für Kopfleiste, Unterschrift und Vorschaubilder */}
+          <div className="relative h-[min(calc(100dvh-12.5rem),calc(min(1200px,96vw)*0.6667))] w-full shrink-0 overflow-hidden" {...swipe}>
+            {/* Nachbarbilder vorladen, damit beim Gleiten kein leeres Feld hereinkommt */}
+            {images.length > 1 &&
+              [wrap(index + 1), wrap(index - 1)]
+                .filter((i) => i !== index)
+                .map((i) => (
+                  <div key={images[i].id} className="invisible absolute inset-0" aria-hidden>
+                    <ListingImage src={images[i].url} alt="" fill sizes="96vw" className="object-contain" />
+                  </div>
+                ))}
+            <SlideTransition
+              index={index}
+              direction={dir}
+              render={(i) => (
+                <ListingImage src={images[i]?.url} alt={images[i]?.alt ?? title} fill sizes="96vw" className="object-contain" />
+              )}
             />
             {images.length > 1 && (
               <>

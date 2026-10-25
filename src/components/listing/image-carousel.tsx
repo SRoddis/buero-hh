@@ -8,6 +8,7 @@ import type { PropertyImage } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 import { ListingImage } from "./listing-image";
+import { SlideTransition } from "./slide-transition";
 
 interface ImageCarouselProps {
   images: PropertyImage[];
@@ -34,31 +35,56 @@ export function ImageCarousel({
   maxImages = 5,
   className,
 }: ImageCarouselProps) {
-  const [index, setIndex] = useState(0);
+  const [{ index, dir }, setSlide] = useState<{ index: number; dir: 1 | -1 }>({ index: 0, dir: 1 });
+  // Nachbarbilder erst nach der ersten Interaktion vorladen, damit die Liste nicht alle Bilder auf einmal lädt
+  const [warm, setWarm] = useState(false);
   const visible = images.slice(0, maxImages);
-  const image = visible[index];
+  const wrap = (i: number) => (i + visible.length) % visible.length;
 
-  const go = (delta: number) => setIndex((i) => (i + delta + visible.length) % visible.length);
+  const go = (delta: 1 | -1) => {
+    setWarm(true);
+    setSlide((s) => ({ index: wrap(s.index + delta), dir: delta }));
+  };
   // Wischen auch dann, wenn eine Link-Fläche der Karte über dem Bild liegt (siehe data-swipe-area)
   const rootRef = useRef<HTMLDivElement>(null);
   useSwipeArea(rootRef, { onNext: () => go(1), onPrevious: () => go(-1) }, visible.length > 1);
 
-  const step = (delta: number) => (e: React.MouseEvent) => {
+  const step = (delta: 1 | -1) => (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIndex((i) => (i + delta + visible.length) % visible.length);
+    go(delta);
   };
 
-  return (
-    <div ref={rootRef} className={cn("relative aspect-[16/10] overflow-hidden bg-muted", className)}>
+  const renderImage = (i: number, imageClassName?: string) => {
+    const image = visible[i];
+    return (
       <ListingImage
         src={image?.thumbUrl ?? image?.url}
         alt={image?.alt ?? alt}
         fill
-        priority={priority}
+        priority={priority && i === 0}
         sizes={sizes}
-        className="transition-transform duration-500 group-hover:scale-[1.03]"
+        className={cn("transition-transform duration-500 group-hover:scale-[1.03]", imageClassName)}
       />
+    );
+  };
+
+  return (
+    <div
+      ref={rootRef}
+      className={cn("relative aspect-[16/10] overflow-hidden bg-muted", className)}
+      onPointerEnter={visible.length > 1 ? () => setWarm(true) : undefined}
+    >
+      {warm &&
+        visible.length > 1 &&
+        [wrap(index + 1), wrap(index - 1)]
+          .filter((i) => i !== index)
+          .map((i) => (
+            <div key={visible[i].id} className="invisible absolute inset-0" aria-hidden>
+              {renderImage(i)}
+            </div>
+          ))}
+      <SlideTransition index={index} direction={dir} render={renderImage} />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/10" />
 
       {visible.length > 1 && (

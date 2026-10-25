@@ -36,12 +36,13 @@ export function MapListingPreview({
         className={compact ? "aspect-[2/1]" : undefined}
       >
         <div className="absolute top-3 right-3 z-10 flex gap-2">
-          <FavoriteButton listingId={marker.id} variant="outline" className="size-9 border-0 shadow-md" />
+          {/* gleicher Stil wie auf den Listenkarten */}
+          <FavoriteButton listingId={marker.id} />
           <button
             type="button"
             onClick={onClose}
             aria-label="Schließen"
-            className="flex size-9 items-center justify-center rounded-full bg-white text-foreground shadow-md transition-colors hover:bg-muted"
+            className="inline-flex size-9 items-center justify-center rounded-full bg-black/25 text-white backdrop-blur-sm transition-all hover:bg-black/40 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
           >
             <X className="size-5" />
           </button>

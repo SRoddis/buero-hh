@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import type { MapMarker } from "@/lib/types";
@@ -17,7 +17,6 @@ export function MapGroupCard({
   initialId,
   onActiveChange,
   onClose,
-  onShowAll,
   compact = false,
   className,
 }: {
@@ -27,7 +26,6 @@ export function MapGroupCard({
   /** Meldet das aktuell angezeigte Angebot (für den Preis-Pin auf der Karte) */
   onActiveChange: (id: string) => void;
   onClose: () => void;
-  onShowAll: () => void;
   /** Mobil: flacheres Bild, damit der Ort darüber sichtbar bleibt */
   compact?: boolean;
   className?: string;
@@ -58,17 +56,6 @@ export function MapGroupCard({
           {index + 1} von {markers.length}
         </span>
         <PagerButton direction="next" onClick={() => step(1)} />
-      </div>
-
-      <div className="px-4 pb-4">
-        <button
-          type="button"
-          onClick={onShowAll}
-          className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl bg-brand-light text-sm font-semibold text-brand transition-colors hover:bg-brand hover:text-white"
-        >
-          Alle {markers.length} Angebote anzeigen
-          <ArrowRight className="size-4" />
-        </button>
       </div>
     </article>
   );
