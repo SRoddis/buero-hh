@@ -157,23 +157,131 @@ Basis-URL: `https://www.buerohamburg.de` (Stand der Felder: Oktober 2026)
 
 ### Endpunkte
 
+Ermittelt aus den JavaScript-Bundles der Website (`/_nuxt/*.js`) und einmal live geprüft. Eine Routenliste veröffentlicht der Server nicht; naheliegende weitere Pfade (`/api/lagen`, `/api/stadtteile`, `/api/objects/all`, `/sitemap.xml` …) liefern alle `404`.
+
+**Objektdaten (lesend, von uns genutzt bzw. nutzbar):**
+
 | Methode | Pfad | Antwort |
 | --- | --- | --- |
-| GET | `/api/objects/search?lage=…&objektart=…` | `{ total, items: [...] }` – alle passenden Objekte auf einmal, keine Seitenaufteilung |
+| GET | `/api/objects/search?lage=…` | `{ total, items: [...] }` – alle passenden Objekte auf einmal, keine Seitenaufteilung, Felder gekürzt (siehe unten) |
 | GET | `/api/objects/<objektnr>` | ein Objekt mit allen Feldern, unbekannte Nummer → `404` |
-| GET/HEAD | `/objects/images/<objektnr>/<NN>_webBig.jpg` | Bild als JPEG, `NN` = `01` … `19` |
+| GET | `/api/objects?nr=<nr>,<nr>,…` | **bis zu 50 Objekte** mit allen Feldern (identisch zum Einzelabruf) als Array, unbekannte Nummern fehlen einfach, mehr als 50 → `400`. Nutzt die Website für Merkliste/Vergleich. |
+| GET | `/api/objects/home` | die 4 Top-Objekte der Startseite (alle Felder, Reihenfolge über `webs_home`) |
+| GET/HEAD | `/objects/images/<objektnr>/<NN>_webBig.jpg` | Bild groß (JPEG, ~800 KB), `NN` = `01` … `19` |
+| GET/HEAD | `/objects/images/<objektnr>/<NN>_web.jpg` | dasselbe Bild klein, 640 × 480 (~140 KB) – von der Website als Vorschau genutzt |
 | GET/HEAD | `/objects/pdf/BHI_<objektnr>.pdf` | Exposé-PDF |
 | – | `/objekt.php?objekt=<objektnr>` | Detailseite der alten Website (HTML) |
+
+**Weitere Endpunkte der Website** (von uns nicht genutzt):
+
+| Methode | Pfad | Zweck |
+| --- | --- | --- |
+| GET | `/api/gesuche` | aktuelle Mietgesuche für die Seite „Für Vermieter“ (`webs_objekttitel`, `webs_lage`, `webs_beschreibung`, `webs_mietflaeche…`, `webs_ansprechpartner`, `webs_lieferung`) |
+| GET | `/api/pdf/merkliste?nr=<nr>,…` | PDF-Liste mehrerer Objekte (bei mehr als 50 Objekten ohne `nr`, dann aus der Sitzung) |
+| GET | `/api/pdf/vergleich?nr=<nr>,…` | Vergleichs-PDF (höchstens 50 Objekte) |
+| GET / POST / DELETE | `/api/merkliste` | Merkliste der Sitzung (Cookie): lesen → `{ id, objektnr: [] }`, `POST { objektnr }`, `DELETE ?objektnr=` |
+| POST | `/api/merkliste/teilen` | Merkliste speichern → `{ id }` zum Teilen |
+| POST | `/api/merkliste/laden` | geteilte Merkliste laden, `{ merkliste: <id> }` |
+| POST | `/api/suchauftrag` | Suchauftrag absenden (`name`, `email`, `telefon`, `objektart`, `lage`, `mietflaeche_von/bis`, `mietpreis_von/bis`, `kriterien`, `kommentar`, `website` = Spam-Falle) – löst echte E-Mails aus, **nicht testen** |
+| GET | `/api/dsgvo?uid=…` | Bestätigung der Datenschutz-Einwilligung aus E-Mail-Links → `{ ok, status }` |
+
+Die Merkliste-Aufrufe senden den Header `X-Consent-Functionality: 1`, wenn der Besucher funktionalen Cookies zugestimmt hat.
 
 **Suche – Parameter** (mehrfach angeben = ODER-Verknüpfung):
 
 - `lage` (Pflicht): `HH-City`, `HH-City-Süd`, `HH-Alster`, `HH-West`, `HH-Nord`, `HH-Ost`, `HH-Süd`. Ohne `lage` liefert die API keine Treffer.
 - `objektart` (optional): `Büro`, `Laden`. Unbekannte Werte (z. B. `Halle`) → `400`. Gemischte Objekte mit Halle/Lager-Anteil kommen über `Büro` mit; **reine** Hallen/Lager- und Gastro-Objekte nur ohne `objektart`.
-- Scraper und Sync fragen deshalb alle sieben Lagen **ohne** `objektart` ab = Gesamtbestand (1.172 Objekte, Stand 25.10.2026; mit `objektart=Büro&objektart=Laden` wären es nur 1.165).
+- `flaeche_von`, `flaeche_bis` (optional): Fläche in m², filtert serverseitig. Alle übrigen Filter der Website (Stadtteil, Mietpreis, Merkmale) laufen nur im Browser; solche Parameter ignoriert die API.
+- Scraper und Sync fragen alle sieben Lagen **ohne** `objektart` ab = Gesamtbestand (1.172 Objekte, Stand 25.10.2026; mit `objektart=Büro&objektart=Laden` wären es nur 1.165).
+
+### curl-Beispiele
+
+Umlaute in URLs kodiert (`ü` = `%C3%BC`). `-s` unterdrückt die Fortschrittsanzeige, `| jq` (optional) formatiert JSON.
+
+**Objektdaten**
 
 ```bash
-curl 'https://www.buerohamburg.de/api/objects/search?lage=HH-Nord&lage=HH-Alster&lage=HH-West&lage=HH-City&lage=HH-City-S%C3%BCd&lage=HH-Ost&lage=HH-S%C3%BCd'
-curl 'https://www.buerohamburg.de/api/objects/946'
+# Gesamtbestand (alle sieben Lagen)
+curl -s 'https://www.buerohamburg.de/api/objects/search?lage=HH-Nord&lage=HH-Alster&lage=HH-West&lage=HH-City&lage=HH-City-S%C3%BCd&lage=HH-Ost&lage=HH-S%C3%BCd' | jq '.total'
+
+# nur Büros in der City mit 500–1.000 m²
+curl -s 'https://www.buerohamburg.de/api/objects/search?lage=HH-City&objektart=B%C3%BCro&flaeche_von=500&flaeche_bis=1000' | jq '.total'
+
+# ein Objekt mit allen Feldern
+curl -s 'https://www.buerohamburg.de/api/objects/946' | jq
+
+# mehrere Objekte mit allen Feldern (höchstens 50 Nummern)
+curl -s 'https://www.buerohamburg.de/api/objects?nr=946,2352,25703' | jq 'map({webs_objektnr, webs_objekttitel})'
+
+# Top-Objekte der Startseite
+curl -s 'https://www.buerohamburg.de/api/objects/home' | jq 'map({webs_objektnr, webs_home})'
+```
+
+**Bilder und PDFs**
+
+```bash
+# prüfen, ob Bild 01 existiert (200 = ja, 404 = nein)
+curl -sI 'https://www.buerohamburg.de/objects/images/946/01_webBig.jpg'
+
+# Bild groß bzw. klein (640 × 480) herunterladen
+curl -s -o 946_01.jpg       'https://www.buerohamburg.de/objects/images/946/01_webBig.jpg'
+curl -s -o 946_01_klein.jpg 'https://www.buerohamburg.de/objects/images/946/01_web.jpg'
+
+# Exposé herunterladen
+curl -s -o BHI_946.pdf 'https://www.buerohamburg.de/objects/pdf/BHI_946.pdf'
+
+# PDF-Liste bzw. Vergleichs-PDF mehrerer Objekte (nur GET, HEAD liefert 404)
+curl -s -o merkliste.pdf 'https://www.buerohamburg.de/api/pdf/merkliste?nr=946,2352'
+curl -s -o vergleich.pdf 'https://www.buerohamburg.de/api/pdf/vergleich?nr=946,2352'
+```
+
+**Weitere Endpunkte**
+
+```bash
+# Mietgesuche (Seite „Für Vermieter“)
+curl -s 'https://www.buerohamburg.de/api/gesuche' | jq 'map({webs_objekttitel, webs_lage, webs_mietflaeche})'
+
+# Datenschutz-Bestätigung (uid stammt aus dem E-Mail-Link)
+curl -s 'https://www.buerohamburg.de/api/dsgvo?uid=<uid>'
+```
+
+**Merkliste** – an die Sitzung gebunden. Das Cookie wird in `cookies.txt` gespeichert und wieder mitgeschickt (`-c` / `-b`):
+
+```bash
+# lesen (legt beim ersten Aufruf eine Sitzung an)
+curl -s -c cookies.txt -b cookies.txt 'https://www.buerohamburg.de/api/merkliste'
+
+# Objekt hinzufügen / entfernen
+curl -s -c cookies.txt -b cookies.txt -X POST 'https://www.buerohamburg.de/api/merkliste' \
+  -H 'Content-Type: application/json' -H 'X-Consent-Functionality: 1' -d '{"objektnr":"946"}'
+curl -s -c cookies.txt -b cookies.txt -X DELETE 'https://www.buerohamburg.de/api/merkliste?objektnr=946' \
+  -H 'X-Consent-Functionality: 1'
+
+# teilen → { "id": "…" } · geteilte Merkliste in eine Sitzung laden
+curl -s -c cookies.txt -b cookies.txt -X POST 'https://www.buerohamburg.de/api/merkliste/teilen' -H 'X-Consent-Functionality: 1'
+curl -s -c cookies.txt -b cookies.txt -X POST 'https://www.buerohamburg.de/api/merkliste/laden' \
+  -H 'Content-Type: application/json' -H 'X-Consent-Functionality: 1' -d '{"merkliste":"<id>"}'
+```
+
+**Suchauftrag** – ⚠️ verschickt echte E-Mails an BüroHamburg, nur nach Absprache ausführen. `website` muss leer bleiben (Spam-Falle). Das Format von `objektart`, `lage` und `kriterien` ist aus dem Website-Code abgeleitet und nicht live geprüft:
+
+```bash
+curl -s -X POST 'https://www.buerohamburg.de/api/suchauftrag' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "Max Mustermann",
+    "email": "max@example.com",
+    "telefon": "040 123456",
+    "objektart": ["Büro"],
+    "lage": ["HH-City", "HH-Alster"],
+    "mietflaeche_von": "200",
+    "mietflaeche_bis": "400",
+    "mietpreis_von": "15",
+    "mietpreis_bis": "25",
+    "kriterien": ["Balkon / Terrasse"],
+    "kommentar": "Test – bitte ignorieren",
+    "website": ""
+  }'
 ```
 
 ### Felder

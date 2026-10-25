@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, List, Map as MapIcon, SearchX } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ListingCard } from "@/components/listing/listing-card";
 import { ListingsMap } from "@/components/map/listings-map-lazy";
@@ -41,13 +41,44 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
   /** Anforderung „auf der Karte anzeigen“ – seq unterscheidet wiederholte Klicks auf dasselbe Objekt */
   const [mapFocus, setMapFocus] = useState<{ id: string; seq: number } | null>(null);
 
+  /**
+   * Mobil: Die Kartenansicht bekommt einen eigenen Verlaufseintrag, damit „Zurück“ zur Liste an die
+   * vorherige Scrollposition führt statt die Suche zu verlassen. Gesetzt, solange dieser Eintrag aktiv ist.
+   */
+  const mapEntry = useRef<{ scrollY: number } | null>(null);
+
+  const openMobileMap = () => {
+    if (!mapEntry.current) {
+      mapEntry.current = { scrollY: window.scrollY };
+      window.history.pushState(window.history.state, "", window.location.href);
+    }
+    setView("karte");
+    window.scrollTo({ top: 0 });
+  };
+
+  const closeMobileMap = () => {
+    // Über den Verlauf zurück – der popstate-Handler stellt Liste und Scrollposition wieder her
+    if (mapEntry.current) window.history.back();
+    else setView("liste");
+  };
+
+  useEffect(() => {
+    const onPopState = () => {
+      const entry = mapEntry.current;
+      if (!entry) return;
+      mapEntry.current = null;
+      setView("liste");
+      // erst nach dem Rendern der Liste scrollen, sonst ist die Seite noch zu kurz
+      requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: entry.scrollY })));
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   const showOnMap = (id: string) => {
     if (mapSize === 0) setMapSize(1);
     const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
-    if (!isDesktop) {
-      setView("karte");
-      window.scrollTo({ top: 0 });
-    }
+    if (!isDesktop) openMobileMap();
     setSelectedId(id);
     // erst nach dem Umschalten, damit die Karte ihre endgültige Größe hat
     requestAnimationFrame(() => setMapFocus((f) => ({ id, seq: (f?.seq ?? 0) + 1 })));
@@ -72,7 +103,7 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
 
       {/* Kopfzeile in beiden Ansichten über die volle Breite – Bedienelemente bleiben immer oben rechts */}
       <div className="shrink-0 px-4 pt-4 sm:px-6 lg:px-8">
-        <ResultsHeader total={result.total} view={view} onViewChange={setView} />
+        <ResultsHeader total={result.total} view={view} onViewChange={(v) => (v === "liste" ? closeMobileMap() : setView(v))} />
       </div>
 
       <div
@@ -168,10 +199,7 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
         <Button
           size="lg"
           className="pointer-events-auto h-12 gap-2 rounded-full px-6 text-[0.95rem] shadow-xl"
-          onClick={() => {
-            setView(view === "liste" ? "karte" : "liste");
-            window.scrollTo({ top: 0 });
-          }}
+          onClick={() => (view === "liste" ? openMobileMap() : closeMobileMap())}
         >
           {view === "liste" ? <MapIcon className="size-[18px]" /> : <List className="size-[18px]" />}
           {view === "liste" ? "Karte" : "Liste"}
