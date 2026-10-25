@@ -35,6 +35,46 @@ Die App benötigt Supabase (siehe [Supabase anbinden](#supabase-anbinden)). Fehl
 - **Merkliste** ohne Login (lokal im Browser)
 - **Responsive:** Desktop als App-Layout in Bildschirmhöhe (Liste scrollt, Karte fix, Größe umschaltbar); mobil Such-Fly-up und Umschalter Liste/Karte
 
+## Architektur
+
+```mermaid
+flowchart LR
+  user(["Besucher<br/>(Browser)"])
+
+  subgraph render["Render"]
+    next["Next.js App<br/>Seiten · /api/listings · Kontaktformular"]
+  end
+
+  subgraph supabase["Supabase"]
+    db[("Postgres + PostGIS<br/>Objekte · Suche · Anfragen")]
+    storage[("Storage<br/>Bilder als WebP")]
+    cron["pg_cron<br/>alle 10 Min. / jede Minute"]
+    sync["Edge Function<br/>sync-buerohamburg"]
+  end
+
+  subgraph bh["buerohamburg.de (FileMaker)"]
+    api["JSON-API<br/>Objekte · Bilder"]
+    pdf["Exposé- und<br/>Vergleichs-PDFs"]
+  end
+
+  tiles["OpenFreeMap<br/>Kartenkacheln"]
+
+  user -- Seiten --> next
+  next -- Abfragen --> db
+  user -- Bilder --> storage
+  user -- Karte --> tiles
+  user -- PDFs --> pdf
+  cron -- startet --> sync
+  sync -- liest --> api
+  sync -- schreibt --> db
+  sync -- WebP --> storage
+```
+
+- **Next.js** (auf Render) rendert alle Seiten serverseitig und liest ausschließlich aus Supabase. Ist Supabase nicht erreichbar, erscheint die Störungsseite.
+- **Sync:** pg_cron startet die Edge Function. Sie gleicht alle 10 Minuten den Bestand mit der API von buerohamburg.de ab und wandelt jede Minute neue Bilder in WebP um (Details unter [Laufender Abgleich](#laufender-abgleich-mit-buerohamburgde)).
+- **Direkt aus dem Browser** kommen Bilder (Supabase Storage), Kartenkacheln (OpenFreeMap) sowie Exposés und Vergleichs-PDFs (buerohamburg.de).
+- Der direkte **FileMaker-Sync** über die Data API (`services/filemaker-sync`) ist vorbereitet, aber noch nicht aktiv.
+
 ## Projektstruktur
 
 ```
