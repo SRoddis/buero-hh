@@ -15,7 +15,7 @@ import { rememberSearchPosition } from "./search-return";
 
 /** Leiste am unteren Rand, sobald mindestens ein Objekt zum Vergleich gewählt ist. Vergleichen ab 2 Objekten. */
 export function CompareBar({ className }: { className?: string }) {
-  const { items: selected, remove } = useCompare();
+  const { items: selected, remove, replace } = useCompare();
   // Nach dem Entfernen des letzten Objekts die bisherige Auswahl noch zeigen, bis die Leiste hinausgeglitten ist
   const [lastShown, setLastShown] = useState(selected);
   if (selected.length && selected !== lastShown) setLastShown(selected);
@@ -108,6 +108,16 @@ export function CompareBar({ className }: { className?: string }) {
             <span className="hidden sm:inline">Jetzt vergleichen</span>
           </span>
         )}
+        {/* Vergleich abbrechen: alle Haken entfernen – die Leiste gleitet hinaus */}
+        <button
+          type="button"
+          onClick={() => replace([])}
+          aria-label="Vergleich abbrechen"
+          title="Vergleich abbrechen"
+          className="-ml-1 flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none sm:ml-0"
+        >
+          <X className="size-5" />
+        </button>
       </div>
     </div>
   );
