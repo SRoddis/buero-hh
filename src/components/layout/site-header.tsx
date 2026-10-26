@@ -16,7 +16,7 @@ const NAV_ITEMS = [
   { label: "Home", href: "/" },
   { label: "Über uns", href: "/ueber-uns" },
   { label: "Immobilien suchen", href: "/immobilien" },
-  { label: "Für Vermieter", href: "https://www.buerohamburg.de" },
+  { label: "Für Vermieter", href: "/fuer-vermieter" },
   { label: "Suchauftrag", href: "https://www.buerohamburg.de" },
 ];
 
