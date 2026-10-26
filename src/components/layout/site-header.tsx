@@ -6,7 +6,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { useFavorites } from "@/components/favorites/favorites-provider";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { useSearchRequest } from "@/components/search-request/search-request-dialog";
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 import { Logo } from "./logo";
@@ -17,12 +18,12 @@ const NAV_ITEMS = [
   { label: "Über uns", href: "/ueber-uns" },
   { label: "Immobilien suchen", href: "/immobilien" },
   { label: "Für Vermieter", href: "/fuer-vermieter" },
-  { label: "Suchauftrag", href: "https://www.buerohamburg.de" },
 ];
 
 export function SiteHeader() {
   const pathname = usePathname();
   const { ids, ready } = useFavorites();
+  const searchRequest = useSearchRequest();
   // „/“ nur exakt, sonst wäre Home auf jeder Seite aktiv
   const isActive = (href: string) => href.startsWith("/") && (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
@@ -45,6 +46,14 @@ export function SiteHeader() {
               {item.label}
             </Link>
           ))}
+          {/* Suchauftrag öffnet ein Fenster statt einer Seite */}
+          <button
+            type="button"
+            onClick={searchRequest.open}
+            className="relative px-3 py-2 text-[0.95rem] text-white/90 transition-colors hover:text-white"
+          >
+            Suchauftrag
+          </button>
           <MerklisteLink count={ready ? ids.length : 0} active={isActive("/merkliste")} />
         </nav>
 
@@ -71,7 +80,7 @@ export function SiteHeader() {
                 <SheetTitle>Menü</SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col px-2" aria-label="Mobile Navigation">
-                {[...NAV_ITEMS, { label: "Merkliste", href: "/merkliste" }].map((item) => (
+                {NAV_ITEMS.map((item) => (
                   <Link
                     key={item.label}
                     href={item.href}
@@ -83,6 +92,20 @@ export function SiteHeader() {
                     {item.label}
                   </Link>
                 ))}
+                <SheetClose asChild>
+                  <button type="button" onClick={searchRequest.open} className="rounded-lg px-3 py-3 text-left text-base hover:bg-muted">
+                    Suchauftrag
+                  </button>
+                </SheetClose>
+                <Link
+                  href="/merkliste"
+                  className={cn(
+                    "rounded-lg px-3 py-3 text-base hover:bg-muted",
+                    isActive("/merkliste") && "bg-accent font-semibold text-accent-foreground",
+                  )}
+                >
+                  Merkliste
+                </Link>
               </nav>
             </SheetContent>
           </Sheet>

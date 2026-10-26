@@ -3,6 +3,8 @@
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
+/* Niedrige Fenster (z. B. Laptops) – Formulare etwas kompakter */
+@custom-variant short (@media (max-height: 900px));
 
 @theme inline {
   --color-background: var(--background);

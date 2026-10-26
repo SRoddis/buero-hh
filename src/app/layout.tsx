@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 
 import { CompareProvider } from "@/components/compare/compare-provider";
+import { SearchRequestProvider } from "@/components/search-request/search-request-dialog";
 import { FavoritesProvider } from "@/components/favorites/favorites-provider";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { ScrollToTop } from "@/components/layout/scroll-to-top";
@@ -34,11 +35,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <TooltipProvider>
           <FavoritesProvider>
             <CompareProvider>
-              <SiteHeader />
-              <div className="flex flex-1 flex-col">{children}</div>
-              <SiteFooter />
-              <ScrollToTop />
-              <Toaster position="bottom-center" />
+              <SearchRequestProvider>
+                <SiteHeader />
+                <div className="flex flex-1 flex-col">{children}</div>
+                <SiteFooter />
+                <ScrollToTop />
+                <Toaster position="bottom-center" />
+              </SearchRequestProvider>
             </CompareProvider>
           </FavoritesProvider>
         </TooltipProvider>
