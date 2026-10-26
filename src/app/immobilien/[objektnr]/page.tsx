@@ -1,7 +1,7 @@
 import { ChevronRight, FileText, MapPin } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
 
 import { ContactForm } from "@/components/detail/contact-form";
@@ -24,24 +24,40 @@ import {
   formatRentPerSqmHint,
 } from "@/lib/format";
 import { DEFAULT_FILTERS, filtersToHref } from "@/lib/search/params";
+import { listingHref, REFERENCE_NUMBER } from "@/lib/urls";
 
-type Params = Promise<{ slug: string }>;
+/** /immobilien/<Objektnummer>, z. B. /immobilien/097 */
+type Params = Promise<{ objektnr: string }>;
 
 /** Dedupliziert den Abruf zwischen generateMetadata und der Seite. */
-const getListing = cache(async (slug: string) => (await getRepository()).getBySlug(slug));
+const getListing = cache(async (referenceNumber: string) =>
+  REFERENCE_NUMBER.test(referenceNumber) ? (await getRepository()).getByReferenceNumber(referenceNumber) : null,
+);
+
+/**
+ * Frühere Adressen (/immobilien/<titel>-<objektnummer>) dauerhaft auf die neue Form umleiten,
+ * damit geteilte Links und Suchmaschinen-Einträge weiter funktionieren.
+ */
+function redirectLegacySlug(param: string) {
+  const legacy = /-(\d+)$/.exec(decodeURIComponent(param));
+  if (legacy) permanentRedirect(listingHref({ referenceNumber: legacy[1] }));
+}
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const listing = await getListing((await params).slug);
+  const listing = await getListing((await params).objektnr);
   if (!listing) return { title: "Objekt nicht gefunden" };
   return {
     title: `${listing.title} – ${listing.districtName}`,
     description: listing.teaser,
+    alternates: { canonical: listingHref(listing) },
     openGraph: { images: listing.images[0] ? [listing.images[0].url] : [] },
   };
 }
 
 export default async function ListingDetailPage({ params }: { params: Params }) {
-  const listing = await getListing((await params).slug);
+  const { objektnr } = await params;
+  if (!REFERENCE_NUMBER.test(objektnr)) redirectLegacySlug(objektnr);
+  const listing = await getListing(objektnr);
   if (!listing) notFound();
 
   const similar = await (await getRepository()).getSimilar(listing, 3);

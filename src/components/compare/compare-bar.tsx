@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowRight, Plus, Scale, X } from "lucide-react";
-import Link from "next/link";
+import { ArrowRight, LoaderCircle, Plus, Scale, X } from "lucide-react";
+import Link, { useLinkStatus } from "next/link";
 import { useState } from "react";
 
 import { ListingImage } from "@/components/listing/listing-image";
@@ -92,7 +92,7 @@ export function CompareBar({ className }: { className?: string }) {
             onClick={rememberSearchPosition}
             className={cn(buttonVariants({ size: "lg" }), "ml-auto h-11 shrink-0 gap-2 rounded-xl px-4 sm:px-5")}
           >
-            <Scale className="size-[18px]" />
+            <CompareLinkIcon />
             <span className="sm:hidden">Vergleichen</span>
             <span className="hidden sm:inline">Jetzt vergleichen</span>
             <ArrowRight className="hidden size-4 sm:block" />
@@ -120,5 +120,15 @@ export function CompareBar({ className }: { className?: string }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/** Waage, solange nichts passiert; Ladekreis, während die Vergleichsseite geladen wird (muss innerhalb des Links stehen) */
+function CompareLinkIcon() {
+  const { pending } = useLinkStatus();
+  return pending ? (
+    <LoaderCircle className="size-[18px] animate-spin" aria-label="Vergleich wird geladen" />
+  ) : (
+    <Scale className="size-[18px]" aria-hidden />
   );
 }

@@ -40,7 +40,7 @@ export default async function ComparePage({ searchParams }: { searchParams: Sear
     .filter((s): s is ListingSummary => s !== undefined);
 
   // Vollständige Daten (Mieteinheiten, Exposé) für die Vergleichstabelle
-  const listings = (await Promise.all(ordered.map((s) => repository.getBySlug(s.slug)))).filter(
+  const listings = (await Promise.all(ordered.map((s) => repository.getByReferenceNumber(s.referenceNumber)))).filter(
     (l): l is Listing => l !== null,
   );
   // Objekte aus einem älteren Link, die inzwischen vermietet bzw. offline sind

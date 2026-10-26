@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  AttributionControl,
   GeolocateControl,
   LngLatBounds,
   Map as MapLibreMap,
@@ -23,7 +22,9 @@ import { CATEGORY_COLORS, HAMBURG_CENTER, type PropertyCategory } from "@/lib/co
 import type { MapMarker, SearchFilters } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+import { addCollapsedAttribution } from "./attribution";
 import { MapGroupCard } from "./map-group-card";
+import { MapLoading } from "./map-loading";
 import { MapPopupCard } from "./map-popup-card";
 import { PricePin } from "./price-pin";
 import { BRAND, CATEGORY_COLOR_EXPRESSION, displayCategory, MAP_STYLE_URL, toFeatureCollection, WORKER_URL } from "./map-style";
@@ -105,6 +106,16 @@ const FOCUS_POPUP_SHIFT = 150;
 const COMPACT_TOP_INSET = 16;
 /** Verschiebung (px) beim Öffnen einer Gruppenliste auf dem Desktop */
 const GROUP_LIST_SHIFT = 150;
+/** Ausschnitt auf alle Treffer */
+const FIT_OPTIONS = { padding: 64, maxZoom: 14.5 };
+
+function markerBounds(markers: MapMarker[]): LngLatBounds | null {
+  if (!markers.length) return null;
+  return markers.reduce(
+    (b, m) => b.extend([m.lng, m.lat]),
+    new LngLatBounds([markers[0].lng, markers[0].lat], [markers[0].lng, markers[0].lat]),
+  );
+}
 
 /** Trefferfläche um einen Punkt (px) – deckt auch den darüberliegenden Preis-Pin ab */
 const HIT_PADDING: [number, number] = [26, 12];
@@ -130,6 +141,8 @@ export default function ListingsMap(props: ListingsMapProps) {
   const [pinClusterId, setPinClusterId] = useState<number | null>(null);
   const updatePinClusterRef = useRef<() => void>(() => {});
   const [ready, setReady] = useState(false);
+  /** Karte erst einblenden, wenn Kacheln und Punkte gezeichnet sind – verhindert das Flackern beim ersten Laden */
+  const [revealed, setRevealed] = useState(false);
   /** Schmale Karte: Objektkarte als feste Overlay-Karte statt Popup, damit sie nie abgeschnitten wird */
   const [compact, setCompact] = useState(false);
   /** Mehrere Angebote am selben Ort (aus einem nicht weiter teilbaren Cluster) */
@@ -172,11 +185,17 @@ export default function ListingsMap(props: ListingsMapProps) {
   // Karte einmalig initialisieren
   useEffect(() => {
     if (!containerRef.current) return;
+    // Direkt mit dem Ausschnitt der Treffer starten – sonst springt die Karte nach dem Laden sichtbar
+    // von der Hamburg-Übersicht dorthin und lädt alle Kacheln ein zweites Mal
+    const start = latest.current;
+    const startBounds = start.bbox ?? markerBounds(start.markers);
+    if (startBounds) lastFitKey.current = start.fitKey;
     const map = new MapLibreMap({
       container: containerRef.current,
       style: MAP_STYLE_URL,
-      center: HAMBURG_CENTER,
-      zoom: 11,
+      ...(startBounds
+        ? { bounds: startBounds, fitBoundsOptions: start.bbox ? {} : FIT_OPTIONS }
+        : { center: HAMBURG_CENTER, zoom: 11 }),
       minZoom: 8,
       maxZoom: 18,
       attributionControl: false,
@@ -186,7 +205,7 @@ export default function ListingsMap(props: ListingsMapProps) {
     mapRef.current = map;
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     map.addControl(new GeolocateControl({ positionOptions: { enableHighAccuracy: true } }), "top-right");
-    map.addControl(new AttributionControl({ compact: true }), "bottom-right");
+    addCollapsedAttribution(map);
     map.touchZoomRotate.disableRotation();
 
     map.on("load", () => {
@@ -305,6 +324,10 @@ export default function ListingsMap(props: ListingsMapProps) {
       map.on("idle", () => updatePinClusterRef.current());
 
       setReady(true);
+      // einblenden, sobald alles gezeichnet ist; spätestens nach 3 s (z. B. bei langsamen Kacheln)
+      const reveal = () => setRevealed(true);
+      map.once("idle", reveal);
+      setTimeout(reveal, 3000);
     });
 
     const container = containerRef.current;
@@ -337,11 +360,7 @@ export default function ListingsMap(props: ListingsMapProps) {
     if (initial && bbox) {
       map.fitBounds(bbox, { duration: 0 });
     } else if (!bbox && markers.length) {
-      const bounds = markers.reduce(
-        (b, m) => b.extend([m.lng, m.lat]),
-        new LngLatBounds([markers[0].lng, markers[0].lat], [markers[0].lng, markers[0].lat]),
-      );
-      map.fitBounds(bounds, { padding: 64, maxZoom: 14.5, duration: initial ? 0 : 700 });
+      map.fitBounds(markerBounds(markers)!, { ...FIT_OPTIONS, duration: initial ? 0 : 700 });
     }
   }, [ready, markers, fitKey, bbox, colorCategory]);
 
@@ -496,13 +515,12 @@ export default function ListingsMap(props: ListingsMapProps) {
 
   return (
     <div className={cn("relative size-full overflow-hidden bg-[#eef0f1]", className)}>
-      <div ref={containerRef} className="size-full" />
+      <div
+        ref={containerRef}
+        className={cn("size-full transition-opacity duration-500", revealed ? "opacity-100" : "opacity-0")}
+      />
 
-      {!ready && (
-        <div className="absolute inset-0 flex animate-pulse items-center justify-center text-sm text-muted-foreground">
-          Karte wird geladen …
-        </div>
-      )}
+      {!revealed && <MapLoading />}
 
       {/* Nur Desktop: mobil ist die Karte zu klein, um den Ausschnitt sinnvoll zu verschieben */}
       <label className="absolute top-3 left-3 hidden cursor-pointer items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium shadow-md select-none lg:flex">

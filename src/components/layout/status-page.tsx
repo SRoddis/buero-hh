@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 
 /** Gemeinsame Bausteine für Störungs- und 404-Seite */
 
-export const HOMEPAGE = "https://www.buerohamburg.de";
+export const HOMEPAGE = "/";
 
 export function InfoTile({
   icon: Icon,

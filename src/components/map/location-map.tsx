@@ -4,12 +4,13 @@ import { Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from "map
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 
+import { addCollapsedAttribution } from "./attribution";
 import { BRAND, MAP_STYLE_URL, WORKER_URL } from "./map-style";
 
 setWorkerUrl(WORKER_URL);
 
-/** Kleine Lagekarte mit einem Marker für die Detailseite. */
-export default function LocationMap({ lat, lng }: { lat: number; lng: number }) {
+/** Kleine Lagekarte mit einem Marker (Detailseite, Anfahrt auf der Startseite). */
+export default function LocationMap({ lat, lng, zoom = 14.5 }: { lat: number; lng: number; zoom?: number }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -18,15 +19,17 @@ export default function LocationMap({ lat, lng }: { lat: number; lng: number }) 
       container: containerRef.current,
       style: MAP_STYLE_URL,
       center: [lng, lat],
-      zoom: 14.5,
+      zoom,
       scrollZoom: false,
       dragRotate: false,
       cooperativeGestures: true,
+      attributionControl: false,
     });
+    addCollapsedAttribution(map);
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     new Marker({ color: BRAND }).setLngLat([lng, lat]).addTo(map);
     return () => map.remove();
-  }, [lat, lng]);
+  }, [lat, lng, zoom]);
 
   return <div ref={containerRef} className="size-full" />;
 }

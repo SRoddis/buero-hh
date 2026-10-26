@@ -1,9 +1,10 @@
 "use client";
 
-import { AttributionControl, LngLatBounds, Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from "maplibre-gl";
+import { LngLatBounds, Map as MapLibreMap, Marker, NavigationControl, setWorkerUrl } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef } from "react";
 
+import { addCollapsedAttribution } from "./attribution";
 import { MAP_STYLE_URL, WORKER_URL } from "./map-style";
 
 setWorkerUrl(WORKER_URL);
@@ -33,8 +34,7 @@ export default function CompareMap({ points }: { points: ComparePoint[] }) {
     });
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
     // Quellenhinweis eingeklappt (ⓘ), sonst verdeckt er auf der kleinen Karte die Pins
-    map.addControl(new AttributionControl({ compact: true }));
-    map.once("load", () => containerRef.current?.querySelector(".maplibregl-compact-show")?.classList.remove("maplibregl-compact-show"));
+    addCollapsedAttribution(map);
 
     for (const point of current) {
       const el = document.createElement("div");

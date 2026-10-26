@@ -11,10 +11,10 @@ import { cn } from "@/lib/utils";
 
 import { Logo } from "./logo";
 
-/** Inhaltsseiten verweisen bis zur Integration auf den bestehenden Auftritt. */
+/** Noch nicht nachgebaute Inhaltsseiten verweisen bis dahin auf den bestehenden Auftritt. */
 const NAV_ITEMS = [
-  { label: "Home", href: "https://www.buerohamburg.de" },
-  { label: "Über uns", href: "https://www.buerohamburg.de" },
+  { label: "Home", href: "/" },
+  { label: "Über uns", href: "/ueber-uns" },
   { label: "Immobilien suchen", href: "/immobilien" },
   { label: "Für Vermieter", href: "https://www.buerohamburg.de" },
   { label: "Suchauftrag", href: "https://www.buerohamburg.de" },
@@ -23,7 +23,8 @@ const NAV_ITEMS = [
 export function SiteHeader() {
   const pathname = usePathname();
   const { ids, ready } = useFavorites();
-  const isActive = (href: string) => href.startsWith("/") && pathname.startsWith(href);
+  // „/“ nur exakt, sonst wäre Home auf jeder Seite aktiv
+  const isActive = (href: string) => href.startsWith("/") && (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
   return (
     <header className="bg-brand text-white print:hidden">

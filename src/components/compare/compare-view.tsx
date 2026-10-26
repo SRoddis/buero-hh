@@ -9,6 +9,7 @@ import {
   CircleX,
   Euro,
   FileText,
+  Hash,
   Heart,
   Landmark,
   Layers,
@@ -52,6 +53,7 @@ import {
 } from "@/lib/format";
 import type { Listing } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { listingHref } from "@/lib/urls";
 
 import { toCompareItem, useCompare } from "./compare-provider";
 import { searchReturnHref } from "./search-return";
@@ -115,6 +117,7 @@ function buildRows(listings: Listing[]): Row[] {
     { label: "Adresse", icon: Navigation, values: listings.map((l) => l.address || null) },
     { label: "Marktgebiet", icon: Landmark, values: listings.map((l) => marketAreaLabel(l.marketArea)) },
     { label: "Objektart", icon: Building2, values: listings.map(shortCategories) },
+    { label: "Objektnummer", icon: Hash, values: listings.map((l) => l.referenceNumber) },
     { label: "Mietfläche", icon: Maximize, values: listings.map((l) => formatArea(l.area)) },
     { label: "Flächen im Objekt", icon: Layers, values: listings.map((l) => formatFurtherAreas(l)) },
     {
@@ -305,7 +308,7 @@ export function CompareView({ listings, missing = 0 }: { listings: Listing[]; mi
             </ImageCarousel>
             <div className="px-4 py-3">
               <h2 className="line-clamp-1 font-semibold" title={listing.title}>
-                <Link href={`/immobilien/${listing.slug}`} target="_blank" rel="noopener" className="hover:text-brand">
+                <Link href={listingHref(listing)} target="_blank" rel="noopener" className="hover:text-brand">
                   {listing.title}
                 </Link>
               </h2>

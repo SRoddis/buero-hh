@@ -85,7 +85,10 @@ export function ImageCarousel({
             </div>
           ))}
       <SlideTransition index={index} direction={dir} render={renderImage} />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/10" />
+      {/* Abdunklung für lesbare Badges – nicht über dem hellen Platzhalter „Keine Bilder vorhanden“ */}
+      {visible.length > 0 && (
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/10" />
+      )}
 
       {visible.length > 1 && (
         <>

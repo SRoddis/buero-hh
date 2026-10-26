@@ -4,6 +4,7 @@ import Link from "next/link";
 import { PROPERTY_CATEGORIES } from "@/lib/constants";
 import { filtersToHref, DEFAULT_FILTERS } from "@/lib/search/params";
 
+import { LegalLinks } from "./legal-links";
 import { Logo } from "./logo";
 
 /** Stadtteile mit den meisten Angeboten */
@@ -58,10 +59,7 @@ export function SiteFooter() {
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-4 px-4 py-5 text-xs sm:px-6 lg:px-8">
           <span>© {new Date().getFullYear()} BüroHamburg.de</span>
-          <div className="flex gap-5">
-            <a href="https://www.buerohamburg.de" className="hover:text-white">Impressum</a>
-            <a href="https://www.buerohamburg.de" className="hover:text-white">Datenschutz</a>
-          </div>
+          <LegalLinks className="gap-x-5 text-xs [&_span.opacity-40]:hidden" linkClassName="hover:text-white hover:no-underline" />
         </div>
       </div>
     </footer>

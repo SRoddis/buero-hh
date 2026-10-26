@@ -6,6 +6,7 @@ import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { LegalLink } from "@/components/layout/legal-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { submitInquiry, type InquiryState } from "@/lib/actions/inquiry";
@@ -92,7 +93,7 @@ export function ContactForm({ propertyId, title, contact }: { propertyId: string
               <Checkbox name="privacy" defaultChecked={values.privacy === "on"} className="mt-0.5" aria-invalid={!!errors.privacy} />
               <span>
                 Ich stimme zu, dass meine Angaben zur Bearbeitung meiner Anfrage gespeichert werden. Hinweise finden Sie in
-                der <a href="https://www.buerohamburg.de" className="text-brand underline">Datenschutzerklärung</a>. *
+                der <LegalLink doc="datenschutz" className="cursor-pointer text-brand underline">Datenschutzerklärung</LegalLink>. *
               </span>
             </label>
             {errors.privacy && <p className="mt-1 text-xs text-destructive">{errors.privacy}</p>}

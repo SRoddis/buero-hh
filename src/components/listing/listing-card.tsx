@@ -10,6 +10,7 @@ import { marketAreaLabel } from "@/lib/constants";
 import { formatArea, formatFurtherAreas, formatRentLabel, formatRentPerSqmHint } from "@/lib/format";
 import type { ListingSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { listingHref } from "@/lib/urls";
 
 import { ImageCarousel } from "./image-carousel";
 import { ListingBadges } from "./listing-badges";
@@ -75,7 +76,7 @@ export const ListingCard = forwardRef<HTMLElement, ListingCardProps>(function Li
       <div className="flex flex-1 flex-col gap-2.5 p-4">
         <div>
           <h3 className="line-clamp-1 text-base font-semibold text-foreground">
-            <Link href={`/immobilien/${listing.slug}`} target="_blank" rel="noopener" className="after:absolute after:inset-0">
+            <Link href={listingHref(listing)} target="_blank" rel="noopener" className="after:absolute after:inset-0">
               {listing.title}
             </Link>
           </h3>

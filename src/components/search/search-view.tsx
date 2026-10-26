@@ -26,8 +26,8 @@ const GRID_COLUMNS: Record<MapSize, string> = {
   2: "lg:grid-cols-[minmax(360px,1fr)_minmax(0,64vw)]",
 };
 
-/** Mobil/Tablet feste Spalten, ab Desktop so viele Spalten (mind. 340 px breit), wie in die Listenspalte passen */
-const CARD_COLUMNS = "sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(340px,1fr))]";
+/** Mobil/Tablet feste Spalten, ab Desktop so viele Spalten (mind. 290 px breit), wie in die Listenspalte passen */
+const CARD_COLUMNS = "sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(290px,1fr))]";
 
 /**
  * Orchestriert Suchleiste, Trefferliste und Karte.
@@ -124,7 +124,8 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
           ref={listRef}
           aria-label="Suchergebnisse"
           className={cn(
-            "min-w-0 px-4 pb-24 sm:px-6 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:pb-6 lg:pl-8",
+            // lg:pt-2: Platz für Anheben und Rahmen der Karte beim Hover – sonst schneidet die Scrollspalte sie oben ab
+            "min-w-0 px-4 pb-24 sm:px-6 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:pt-2 lg:pb-6 lg:pl-8",
             mapSize === 0 ? "lg:pr-8" : "lg:pr-2",
             view === "karte" && "hidden lg:hidden",
             // Platz für die Vergleichsleiste

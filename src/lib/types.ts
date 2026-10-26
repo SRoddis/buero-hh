@@ -110,6 +110,7 @@ export interface Listing extends ListingSummary {
 export type MapMarker = Pick<
   ListingSummary,
   | "id"
+  | "referenceNumber"
   | "slug"
   | "title"
   | "category"

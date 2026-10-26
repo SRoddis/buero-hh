@@ -1,0 +1,23 @@
+/** Firmendaten für Impressum, Kontakt und Anfahrt – übernommen von der bisherigen Website buerohamburg.de */
+export const COMPANY = {
+  name: "BHI Büro Hamburg Immobilien Beratung und Entwicklung GmbH",
+  street: "Hohe Bleichen 21",
+  postalCode: "20354",
+  city: "Hamburg",
+  country: "Deutschland",
+  phone: { display: "040 22 62 11-00", href: "tel:+494022621100" },
+  fax: { display: "040 22 62 11-011" },
+  email: "kontakt@buerohamburg.de",
+  website: "www.buerohamburg.de",
+  managingDirector: "Ulf von der Heydt",
+  register: { court: "Amtsgericht Hamburg", number: "HRB 133592" },
+  /** Zuständige Behörde für die Erlaubnis nach § 34c der Gewerbeordnung */
+  supervisoryAuthority:
+    "Freie und Hansestadt Hamburg, Bezirksamt Hamburg-Nord, Wirtschafts- und Ordnungsamt, Grindelberg 66, 20139 Hamburg",
+  /** Anfahrt mit öffentlichen Verkehrsmitteln */
+  transit: "U2 Gänsemarkt, U- und S-Bahnhof Jungfernstieg, Buslinien 4/5/109 Bushaltestelle Gänsemarkt",
+  /** Hohe Bleichen 21 (OpenStreetMap) */
+  location: { lat: 53.5539837, lng: 9.9871516 },
+} as const;
+
+export const COMPANY_ADDRESS = `${COMPANY.street}, ${COMPANY.postalCode} ${COMPANY.city}`;

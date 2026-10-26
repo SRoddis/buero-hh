@@ -6,6 +6,7 @@ import { ImageCarousel } from "@/components/listing/image-carousel";
 import { formatArea, formatRentLabel } from "@/lib/format";
 import type { MapMarker } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { listingHref } from "@/lib/urls";
 
 /**
  * Oberer Teil der Kartenpopups (Einzelobjekt und mehrere Angebote): Bildkarussell mit Herz und X,
@@ -50,7 +51,7 @@ export function MapListingPreview({
       </ImageCarousel>
 
       <Link
-        href={`/immobilien/${marker.slug}`}
+        href={listingHref(marker)}
         target="_blank"
         rel="noopener"
         className="block px-4 pt-3 pb-3 after:absolute after:inset-0"

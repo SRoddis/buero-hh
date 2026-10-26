@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   PAGE_SIZE,
+  PROPERTY_CATEGORIES,
   type FeatureKey,
   type MarketArea,
   type PropertyCategory,
@@ -67,7 +68,7 @@ const SUMMARY_COLUMNS =
   "id,reference_number,reference_sort,slug,title,teaser,category,categories,property_type,price_type,price_note,commission_free,commission_months,featured_rank,market_area,district_slug,district_name,address,lat,lng,area,area_range_min,area_range_max,rent_per_sqm,rent_total_monthly,features,images";
 
 const MARKER_COLUMNS =
-  "id,slug,title,category,categories,property_type,lat,lng,area,rent_per_sqm,rent_total_monthly,price_type,address,district_name,images";
+  "id,reference_number,slug,title,category,categories,property_type,lat,lng,area,rent_per_sqm,rent_total_monthly,price_type,address,district_name,images";
 
 /** Sortierung über PostgREST; Relevanz = Hervorhebung zuerst, danach die neuesten Objekte */
 const SORT_COLUMNS: Record<SearchFilters["sort"], { column: string; ascending: boolean }[]> = {
@@ -137,6 +138,7 @@ function toMarker(row: ListingRow): MapMarker | null {
   if (row.lat == null || row.lng == null) return null;
   return {
     id: row.id,
+    referenceNumber: row.reference_number,
     slug: row.slug,
     title: row.title,
     category: row.category,
@@ -205,6 +207,42 @@ export class SupabasePropertyRepository implements PropertyRepository {
     };
   }
 
+  async getFeatured(limit = 4) {
+    const { data, error } = await this.db
+      .rpc("search_properties", {})
+      .select(SUMMARY_COLUMNS)
+      .not("featured_rank", "is", null)
+      .order("featured_rank", { ascending: true })
+      .order("reference_sort", { ascending: true })
+      .limit(limit * 3);
+    if (error) throw error;
+    // Je Rang nur ein Objekt (bei gleichem Rang die niedrigere Objektnummer) – so wählt auch buerohamburg.de (/api/objects/home)
+    const seenRanks = new Set<number>();
+    return (data as unknown as ListingRow[])
+      .map(toSummary)
+      .filter((l) => !seenRanks.has(l.featuredRank!) && seenRanks.add(l.featuredRank!))
+      .slice(0, limit);
+  }
+
+  async countListings() {
+    const count = async (args: SearchArgs) => {
+      const { count, error } = await this.db.rpc("search_properties", args, { count: "exact", head: true });
+      if (error) throw error;
+      return count ?? 0;
+    };
+    const [total, ...perCategory] = await Promise.all([
+      count({}),
+      ...PROPERTY_CATEGORIES.map(({ value }) => count({ p_category: value })),
+    ]);
+    return {
+      total,
+      byCategory: Object.fromEntries(PROPERTY_CATEGORIES.map(({ value }, i) => [value, perCategory[i]])) as Record<
+        PropertyCategory,
+        number
+      >,
+    };
+  }
+
   /** Supabase liefert höchstens 1.000 Zeilen pro Abfrage – Kartenpunkte daher seitenweise laden. */
   private async allMarkerRows(args: SearchArgs): Promise<ListingRow[]> {
     const rows: ListingRow[] = [];
@@ -220,11 +258,11 @@ export class SupabasePropertyRepository implements PropertyRepository {
     }
   }
 
-  async getBySlug(slug: string) {
+  async getByReferenceNumber(referenceNumber: string) {
     const { data, error } = await this.db
       .from("property_listings")
       .select("*")
-      .eq("slug", slug)
+      .eq("reference_number", referenceNumber)
       .eq("status", "published")
       .maybeSingle();
     if (error) throw error;

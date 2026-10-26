@@ -81,7 +81,7 @@ flowchart LR
 src/
   app/
     immobilien/(suche)/     Suchseite (Server Component lädt Treffer anhand der URL)
-    immobilien/[slug]/      Detailseite
+    immobilien/[objektnr]/  Detailseite (/immobilien/097; alte Titel-Adressen leiten dorthin um)
     merkliste/              Merkliste
     api/listings/           Kurzinfos für die Merkliste
   components/

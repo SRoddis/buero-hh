@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { PropertyCategory } from "@/lib/constants";
 import type {
   District,
   InquiryInput,
@@ -15,11 +16,16 @@ import type {
  */
 export interface PropertyRepository {
   search(filters: SearchFilters): Promise<SearchResult>;
-  getBySlug(slug: string): Promise<Listing | null>;
+  /** Vollständiges Objekt für die Detailseite über die FileMaker-Objektnummer */
+  getByReferenceNumber(referenceNumber: string): Promise<Listing | null>;
   getByIds(ids: string[]): Promise<ListingSummary[]>;
   /** Über die FileMaker-Objektnummern – dauerhaft stabil, daher für geteilte Links */
   getByReferenceNumbers(referenceNumbers: string[]): Promise<ListingSummary[]>;
   getSimilar(listing: Listing, limit?: number): Promise<ListingSummary[]>;
+  /** Top-Objekte der Startseite (FileMaker-Feld webs_home, Rang 1 zuerst) */
+  getFeatured(limit?: number): Promise<ListingSummary[]>;
+  /** Anzahl veröffentlichter Objekte – gesamt und je Objektart (gemischte Objekte zählen in jeder ihrer Arten) */
+  countListings(): Promise<{ total: number; byCategory: Record<PropertyCategory, number> }>;
   listDistricts(): Promise<District[]>;
   createInquiry(input: InquiryInput): Promise<void>;
 }
