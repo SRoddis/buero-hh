@@ -107,7 +107,7 @@ export default async function ListingDetailPage({ params }: { params: Params }) 
           <div className="min-w-0 space-y-10">
             <header className="space-y-3">
               <div className="flex items-start justify-between gap-4">
-                <ListingBadges categories={listing.categories} features={listing.features} max={3} className="[&>span]:border [&>span]:shadow-none" />
+                <ListingBadges categories={listing.categories} features={listing.features} max={3} />
                 <div className="flex shrink-0 gap-2">
                   <ShareButton title={listing.title} />
                   <FavoriteButton listingId={listing.id} variant="outline" />

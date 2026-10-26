@@ -1,4 +1,11 @@
-import { BADGE_FEATURES, FEATURES, PROPERTY_CATEGORIES, type FeatureKey, type PropertyCategory } from "@/lib/constants";
+import {
+  BADGE_FEATURES,
+  CATEGORY_COLORS,
+  FEATURES,
+  PROPERTY_CATEGORIES,
+  type FeatureKey,
+  type PropertyCategory,
+} from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
 import { FEATURE_ICONS } from "./feature-icons";
@@ -25,17 +32,24 @@ export function ListingBadges({
   const highlighted = BADGE_FEATURES.filter((f) => features.includes(f)).slice(0, Math.max(1, max - categories.length + 1));
 
   return (
-    <div className={cn("flex flex-wrap gap-1.5", className)}>
+    <div className={cn("flex flex-wrap gap-1", className)}>
       {categories.map((category) => (
-        <Pill key={category} className="bg-white text-foreground">
+        <Pill
+          key={category}
+          // Farbe der Objektart wie die Pins auf der Karte – heller Hintergrund, dunklere Schrift für den Kontrast
+          style={{
+            backgroundColor: `color-mix(in srgb, ${CATEGORY_COLORS[category]} 12%, white)`,
+            color: `color-mix(in srgb, ${CATEGORY_COLORS[category]} 80%, black)`,
+          }}
+        >
           {PROPERTY_CATEGORIES.find((c) => c.value === category)?.short}
         </Pill>
       ))}
       {highlighted.map((feature) => {
         const Icon = FEATURE_ICONS[feature];
         return (
-          <Pill key={feature} className={cn("gap-1", FEATURE_BADGE_STYLES[feature])}>
-            <Icon className="size-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+          <Pill key={feature} className={cn("gap-0.5", FEATURE_BADGE_STYLES[feature])}>
+            <Icon className="size-3 shrink-0" strokeWidth={2} aria-hidden />
             {FEATURES[feature]}
           </Pill>
         );
@@ -45,13 +59,19 @@ export function ListingBadges({
 }
 
 /** Feste Höhe und zentrierter Inhalt – sonst streckt die Zeile Pills ohne Icon auf die Höhe der Pills mit Icon und der Text klebt oben */
-function Pill({ className, children }: { className?: string; children: React.ReactNode }) {
+function Pill({
+  className,
+  style,
+  children,
+}: {
+  className?: string;
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+}) {
   return (
     <span
-      className={cn(
-        "inline-flex h-[22px] items-center rounded-full px-2.5 text-xs leading-none font-medium shadow-sm",
-        className,
-      )}
+      style={style}
+      className={cn("inline-flex h-5 items-center rounded-full px-1.5 text-[11px] leading-none font-medium whitespace-nowrap", className)}
     >
       {children}
     </span>

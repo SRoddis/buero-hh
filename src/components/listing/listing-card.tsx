@@ -51,7 +51,6 @@ export const ListingCard = forwardRef<HTMLElement, ListingCardProps>(function Li
         priority={priority}
         sizes="(min-width: 1536px) 22vw, (min-width: 1024px) 28vw, (min-width: 640px) 50vw, 100vw"
       >
-        <ListingBadges categories={listing.categories} features={listing.features} className="absolute bottom-3 left-3" />
         {compare && <CompareCheckbox listing={listing} className="absolute top-3 left-3 z-10" />}
         <div className="absolute top-3 right-3 z-10 flex gap-2">
           {onShowOnMap && listing.lat != null && (
@@ -75,6 +74,12 @@ export const ListingCard = forwardRef<HTMLElement, ListingCardProps>(function Li
 
       <div className="flex flex-1 flex-col gap-2.5 p-4">
         <div>
+          {/* immer eine Zeile (h-5 + overflow-hidden): was nicht passt, bricht in die unsichtbare zweite Zeile um */}
+          <ListingBadges
+            categories={listing.categories}
+            features={listing.features}
+            className="mb-2 h-5 overflow-hidden"
+          />
           <h3 className="line-clamp-1 text-base font-semibold text-foreground">
             <Link href={listingHref(listing)} target="_blank" rel="noopener" className="after:absolute after:inset-0">
               {listing.title}
