@@ -106,6 +106,37 @@ const FOCUS_POPUP_SHIFT = 150;
 const COMPACT_TOP_INSET = 16;
 /** Verschiebung (px) beim Öffnen einer Gruppenliste auf dem Desktop */
 const GROUP_LIST_SHIFT = 150;
+/** Ab dieser Zoomstufe zeigen Einzelobjekte ihren Preis statt eines Punkts */
+const PRICE_LABEL_ZOOM = 15;
+
+/**
+ * Hintergrund der Preis-Labels: weiße Pille mit Rand in der Farbe der Objektart (je Objektart ein Bild).
+ * Dehnbar (stretchX), damit sie sich der Textbreite anpasst.
+ */
+function addPriceLabelImages(map: MapLibreMap) {
+  const ratio = 2;
+  const w = 28 * ratio;
+  const h = 24 * ratio;
+  for (const [category, color] of Object.entries(CATEGORY_COLORS)) {
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d")!;
+    const r = h / 2 - ratio;
+    ctx.beginPath();
+    ctx.roundRect(ratio, ratio, w - 2 * ratio, h - 2 * ratio, r);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.lineWidth = 1.5 * ratio;
+    ctx.strokeStyle = color;
+    ctx.stroke();
+    map.addImage(`price-label-${category}`, ctx.getImageData(0, 0, w, h), {
+      pixelRatio: ratio,
+      stretchX: [[h / 2, w - h / 2]],
+      content: [10 * ratio, 5 * ratio, w - 10 * ratio, h - 5 * ratio],
+    });
+  }
+}
 /** Ausschnitt auf alle Treffer */
 const FIT_OPTIONS = { padding: 64, maxZoom: 14.5 };
 
@@ -256,6 +287,7 @@ export default function ListingsMap(props: ListingsMapProps) {
         id: "points",
         type: "circle",
         source: "listings",
+        maxzoom: PRICE_LABEL_ZOOM,
         filter: ["!", ["has", "point_count"]],
         paint: {
           "circle-color": CATEGORY_COLOR_EXPRESSION,
@@ -263,6 +295,27 @@ export default function ListingsMap(props: ListingsMapProps) {
           "circle-stroke-width": 2.5,
           "circle-stroke-color": "#ffffff",
         },
+      });
+
+      // Näher dran: Preis statt Punkt (wie bei großen Immobilienportalen)
+      addPriceLabelImages(map);
+      map.addLayer({
+        id: "price-labels",
+        type: "symbol",
+        source: "listings",
+        minzoom: PRICE_LABEL_ZOOM,
+        filter: ["!", ["has", "point_count"]],
+        layout: {
+          "text-field": ["get", "price"],
+          "text-font": ["Noto Sans Bold"],
+          "text-size": 13,
+          "icon-image": ["concat", "price-label-", ["get", "category"]],
+          "icon-text-fit": "both",
+          // alle Preise zeigen, auch wenn sie sich berühren – sonst verschwänden Objekte von der Karte
+          "icon-allow-overlap": true,
+          "text-allow-overlap": true,
+        },
+        paint: { "text-color": CATEGORY_COLOR_EXPRESSION },
       });
 
       /*
@@ -276,7 +329,7 @@ export default function ListingsMap(props: ListingsMapProps) {
             [p.x - HIT_PADDING[0], p.y - HIT_PADDING[1]],
             [p.x + HIT_PADDING[0], p.y + HIT_PADDING[1]],
           ],
-          { layers: ["points"] },
+          { layers: ["points", "price-labels"] },
         )[0];
       const clusterAt = (p: Point) => map.queryRenderedFeatures(p, { layers: ["clusters"] })[0];
 
@@ -399,7 +452,9 @@ export default function ListingsMap(props: ListingsMapProps) {
     if (!ready || !map) return;
     const isPoint: FilterSpecification = ["!", ["has", "point_count"]];
     const isCluster: FilterSpecification = ["has", "point_count"];
-    map.setFilter("points", hiddenPointId ? ["all", isPoint, ["!=", ["get", "id"], hiddenPointId]] : isPoint);
+    const pointFilter: FilterSpecification = hiddenPointId ? ["all", isPoint, ["!=", ["get", "id"], hiddenPointId]] : isPoint;
+    map.setFilter("points", pointFilter);
+    map.setFilter("price-labels", pointFilter);
     const clusterFilter: FilterSpecification =
       hiddenClusterId != null ? ["all", isCluster, ["!=", ["get", "cluster_id"], hiddenClusterId]] : isCluster;
     map.setFilter("clusters", clusterFilter);

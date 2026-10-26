@@ -148,8 +148,15 @@ export async function dispatchImages(db: SupabaseClient, secret: string) {
       .catch(() => false),
   );
   const succeeded = results.filter(Boolean).length;
-  // Neue Bild-URLs in das vorberechnete Suchmodell übernehmen
-  if (succeeded > 0) await db.rpc("refresh_property_listings");
+  // Neue Bild-URLs ins vorberechnete Suchmodell übernehmen – aber höchstens alle 10 Minuten bzw. wenn die
+  // Warteschlange leer ist: Ein Neuaufbau pro Minute lastete die Datenbank aus (Timeouts in der Suche)
+  if (succeeded > 0) {
+    const { count: remaining } = await db
+      .from("property_images")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["pending", "processing"]);
+    if (!remaining || new Date().getUTCMinutes() % 10 === 5) await db.rpc("refresh_property_listings");
+  }
   return { dispatched: claimed?.length ?? 0, succeeded };
 }
 

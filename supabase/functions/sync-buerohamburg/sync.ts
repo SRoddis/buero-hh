@@ -41,6 +41,8 @@ interface Stats {
   updated: number;
   unchanged: number;
   rechecked: number;
+  /** davon tatsächlich geändert (nur dann muss das Suchmodell neu berechnet werden) */
+  recheckChanged: number;
   archived: number;
   restored: number;
   purged: number;
@@ -79,7 +81,7 @@ export async function runSync(db: SupabaseClient) {
   if (runError) throw runError;
 
   const stats: Stats = {
-    listed: 0, created: 0, updated: 0, unchanged: 0, rechecked: 0,
+    listed: 0, created: 0, updated: 0, unchanged: 0, rechecked: 0, recheckChanged: 0,
     archived: 0, restored: 0, purged: 0, failed: 0, failedRefs: [], imagesQueued: 0, warnings: [],
   };
 
@@ -163,9 +165,10 @@ export async function runSync(db: SupabaseClient) {
     // 6) Lange archivierte Objekte endgültig löschen (inkl. Bilder im Storage)
     stats.purged = await purgeArchived(db);
 
-    // 7) Vorberechnetes Suchmodell aktualisieren, wenn sich etwas geändert hat
+    // 7) Vorberechnetes Suchmodell nur bei echten Änderungen neu berechnen – der Neuaufbau lastet die
+    //    Datenbank spürbar aus (Suchabfragen der Website liefen sonst alle 10 Minuten in den Timeout)
     const changedSomething =
-      stats.created + stats.updated + stats.restored + stats.archived + stats.purged + stats.rechecked > 0;
+      stats.created + stats.updated + stats.restored + stats.archived + stats.purged + stats.recheckChanged > 0;
     if (changedSomething) {
       const { error: refreshError } = await db.rpc("refresh_property_listings");
       if (refreshError) throw refreshError;
@@ -229,6 +232,7 @@ async function importObject(
     stats.imagesQueued += await discoverImages(db, previous.id, ref, o.title);
     return true;
   }
+  if (recheck) stats.recheckChanged++;
 
   const hasCoords = o.lat != null && o.lng != null;
   await db.from("districts").upsert(

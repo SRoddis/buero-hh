@@ -1,6 +1,7 @@
 import type { ExpressionSpecification } from "maplibre-gl";
 
 import { CATEGORY_COLORS, type PropertyCategory } from "@/lib/constants";
+import { formatRentShort } from "@/lib/format";
 import type { MapMarker } from "@/lib/types";
 
 /** Kostenloser Vektor-Kartenstil ohne API-Key; per Umgebungsvariable austauschbar (z. B. MapTiler). */
@@ -38,6 +39,8 @@ export function toFeatureCollection(
       properties: {
         id: m.id,
         category: displayCategory(m, colorCategory),
+        // Preis-Label ab PRICE_LABEL_ZOOM
+        price: formatRentShort(m),
       },
     })),
   };

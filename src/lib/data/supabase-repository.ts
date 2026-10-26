@@ -178,10 +178,28 @@ const UUID = /^[0-9a-f-]{36}$/i;
 /** Maximale Zeilenzahl pro Abfrage (Supabase-Standard „max rows“) */
 const MAX_ROWS = 1000;
 
+/**
+ * Einmal wiederholen, wenn Postgres eine Abfrage wegen Zeitüberschreitung abbricht (57014) – das passiert
+ * vereinzelt, während der Sync die Datenbank auslastet. Erst ein zweiter Fehlschlag zeigt die Störungsseite.
+ */
+async function retryOnTimeout<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    if ((error as { code?: string })?.code !== "57014") throw error;
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    return run();
+  }
+}
+
 export class SupabasePropertyRepository implements PropertyRepository {
   private db = getSupabase();
 
-  async search(filters: SearchFilters): Promise<SearchResult> {
+  search(filters: SearchFilters): Promise<SearchResult> {
+    return retryOnTimeout(() => this.searchOnce(filters));
+  }
+
+  private async searchOnce(filters: SearchFilters): Promise<SearchResult> {
     const args = searchArgs(filters);
     const from = (filters.page - 1) * PAGE_SIZE;
 
@@ -258,7 +276,11 @@ export class SupabasePropertyRepository implements PropertyRepository {
     }
   }
 
-  async getByReferenceNumber(referenceNumber: string) {
+  getByReferenceNumber(referenceNumber: string) {
+    return retryOnTimeout(() => this.getByReferenceNumberOnce(referenceNumber));
+  }
+
+  private async getByReferenceNumberOnce(referenceNumber: string) {
     const { data, error } = await this.db
       .from("property_listings")
       .select("*")
