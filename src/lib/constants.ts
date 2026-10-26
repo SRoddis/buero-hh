@@ -76,7 +76,8 @@ export const SORT_OPTIONS = [
 
 export type SortKey = (typeof SORT_OPTIONS)[number]["value"];
 
-export const PAGE_SIZE = 12;
+/** Teilbar durch 1, 2, 3, 4, 6 und 8 – die möglichen Spaltenzahlen der Ergebnisliste (siehe CARD_COLUMNS) */
+export const PAGE_SIZE = 24;
 
 /** Höchstzahl der Objekte im Objektvergleich */
 export const MAX_COMPARE = 3;

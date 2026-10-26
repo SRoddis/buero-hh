@@ -27,7 +27,12 @@ const GRID_COLUMNS: Record<MapSize, string> = {
 };
 
 /** Mobil/Tablet feste Spalten, ab Desktop so viele Spalten (mind. 290 px breit), wie in die Listenspalte passen */
-const CARD_COLUMNS = "sm:grid-cols-2 lg:grid-cols-[repeat(auto-fill,minmax(290px,1fr))]";
+/**
+ * Spalten nach Breite der Liste (Container Query, Karten mind. 290 px + 20 px Abstand) – nur 1, 2, 3, 4, 6 oder 8,
+ * damit PAGE_SIZE (24) immer volle Reihen ergibt und keine Lücken am Ende bleiben
+ */
+const CARD_COLUMNS =
+  "grid-cols-1 @min-[600px]:grid-cols-2 @min-[910px]:grid-cols-3 @min-[1220px]:grid-cols-4 @min-[1840px]:grid-cols-6 @min-[2460px]:grid-cols-8";
 
 /**
  * Orchestriert Suchleiste, Trefferliste und Karte.
@@ -132,7 +137,7 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
             comparing && "pb-40 lg:pb-28",
           )}
         >
-          <div className="space-y-5">
+          <div className="@container space-y-5">
             {result.items.length === 0 ? (
               <EmptyState hasBbox={filters.bbox !== null} onReset={reset} onClearBbox={() => update({ bbox: null })} />
             ) : (

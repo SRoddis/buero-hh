@@ -391,10 +391,22 @@ npm run sync            # einmalig; SYNC_INTERVAL_MINUTES für Daemon-Betrieb
 
 > Layout- und Feldnamen (`src/config.ts`, `src/filemaker/types.ts`, `src/mapping.ts`) sind Annahmen und müssen mit der realen FileMaker-Lösung abgeglichen werden.
 
+## Vor dem Go-live
+
+Offene Punkte, die vor der Umstellung von www.buerohamburg.de geklärt bzw. umgesetzt sein müssen:
+
+- [ ] **Objektanfragen landen nur in der Datenbank.** Das Formular auf den Objektseiten (`src/lib/actions/inquiry.ts`) speichert Anfragen in der Tabelle `inquiries` – es wird **niemand benachrichtigt**. Auf der bisherigen Website gab es kein solches Formular (nur E-Mail und Telefon). Vor dem Go-live entscheiden: Benachrichtigung einbauen (E-Mail an BüroHamburg, Datenbank-Webhook oder Export nach FileMaker, siehe `services/filemaker-sync`) – oder das Formular durch E-Mail/Telefon ersetzen. Sonst gehen Kundenanfragen unbemerkt verloren.
+- [ ] **Datenschutzerklärung freigeben** (`src/content/legal/datenschutz.ts`, Entwurf an die neue Website angepasst): Freigabe durch BüroHamburg bzw. Datenschutzbeauftragten; Anschriften von Render, Supabase und SalesViewer prüfen; Serverstandorte (Region von Render und Supabase) ergänzen; bestätigen, dass Suchaufträge per E-Mail ans Team gehen.
+- [ ] **Auftragsverarbeitungsverträge** mit Render, Supabase und – falls weiter genutzt – SalesViewer abschließen.
+- [ ] **SalesViewer klären:** Wird es weiter genutzt? Falls nein, `NEXT_PUBLIC_SALESVIEWER_ID=""` setzen und Abschnitt 6.1 der Datenschutzerklärung sowie die Kategorie „Externe Dienste & Marketing“ im Cookie-Hinweis entfernen. Bei einer anderen Domain als buerohamburg.de ggf. im SalesViewer-Konto eintragen.
+- [ ] **Adresse im Vergleichs-PDF bestätigen:** Das alte PDF nennt „Poststraße 37“, die Website „Hohe Bleichen 21“ (verwendet wird `COMPANY` in `src/lib/company.ts`).
+- [ ] **Suchauftrag:** wird nur im Produktivbetrieb an `/api/suchauftrag` weitergeleitet (lokal nur protokolliert, da die API echte E-Mails verschickt). Nach dem Go-live einmal mit einem gekennzeichneten Testauftrag prüfen und mit BüroHamburg abstimmen. Es gibt außer dem Honeypot keine Begrenzung der Anfragen pro Zeit.
+- [ ] **Cookie-Hinweis:** nutzt dasselbe Cookie `cc_cookie` (Revision 1) wie die bisherige Website, damit bestehende Einwilligungen auf derselben Domain gültig bleiben. Bei geänderten Kategorien/Diensten `CONSENT_REVISION` in `src/lib/consent.ts` erhöhen.
+
 ## Hinweise
 
 - **Karte:** Standardstil ist OpenFreeMap „Positron“ (kostenlos, ohne API-Key). Für den Produktivbetrieb ggf. eigenen Stil/Anbieter über `NEXT_PUBLIC_MAP_STYLE_URL` setzen.
 - **Bilder & PDFs:** werden aktuell von buerohamburg.de geladen; später über den Sync in Supabase Storage.
 - **Ansprechpartner:** Objekte ohne zugeordneten Kontakt zeigen den allgemeinen BüroHamburg-Kontakt.
-- Inhaltsseiten (Home, Über uns, Für Vermieter, Suchauftrag, Impressum, Datenschutz) verlinken vorerst auf www.buerohamburg.de.
+- **Inhaltsseiten:** Home, Über uns und Für Vermieter sind eigene Seiten; Suchauftrag, Impressum, Datenschutz, AGB und Cookie-Einstellungen öffnen als Fenster. Mietgesuche und Suchauftrag laufen weiterhin über die API von buerohamburg.de.
 - Bewusst nicht enthalten: Registrierung/Login und ein eigenes Verwaltungsbackend.

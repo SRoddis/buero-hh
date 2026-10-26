@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 
 import { CompareProvider } from "@/components/compare/compare-provider";
+import { ConsentProvider } from "@/components/consent/consent-provider";
 import { SearchRequestProvider } from "@/components/search-request/search-request-dialog";
 import { FavoritesProvider } from "@/components/favorites/favorites-provider";
 import { SiteFooter } from "@/components/layout/site-footer";
@@ -33,17 +34,19 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="de" className={inter.variable}>
       <body className="flex min-h-dvh flex-col antialiased">
         <TooltipProvider>
-          <FavoritesProvider>
-            <CompareProvider>
-              <SearchRequestProvider>
-                <SiteHeader />
-                <div className="flex flex-1 flex-col">{children}</div>
-                <SiteFooter />
-                <ScrollToTop />
-                <Toaster position="bottom-center" />
-              </SearchRequestProvider>
-            </CompareProvider>
-          </FavoritesProvider>
+          <ConsentProvider>
+            <FavoritesProvider>
+              <CompareProvider>
+                <SearchRequestProvider>
+                  <SiteHeader />
+                  <div className="flex flex-1 flex-col">{children}</div>
+                  <SiteFooter />
+                  <ScrollToTop />
+                  <Toaster position="bottom-center" />
+                </SearchRequestProvider>
+              </CompareProvider>
+            </FavoritesProvider>
+          </ConsentProvider>
         </TooltipProvider>
       </body>
     </html>
