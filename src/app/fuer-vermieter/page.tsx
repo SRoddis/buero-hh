@@ -22,7 +22,7 @@ export default async function LandlordsPage() {
     <main className="mx-auto w-full max-w-[1600px] px-4 pt-8 pb-14 sm:px-6 lg:px-8">
       <p className="text-sm font-medium tracking-wide text-brand uppercase">Für Vermieter und Eigentümer</p>
       <Heading as="h1" className="mt-2">
-        Passende Mieter. <span className="font-bold">Für Ihre Immobilie.</span>
+        Passende Mieter. Für Ihre Immobilie.
       </Heading>
 
       <div className="mt-6 grid gap-x-12 gap-y-4 leading-relaxed text-foreground/80 md:grid-cols-2 md:divide-x">
@@ -83,8 +83,7 @@ function Heading({
     <Tag
       id={id}
       className={cn(
-        "relative pb-3 text-3xl tracking-tight after:absolute after:bottom-0 after:left-0 after:h-1 after:w-12 after:rounded-full after:bg-brand sm:text-4xl",
-        Tag === "h2" ? "font-bold" : "font-normal",
+        "relative pb-3 text-3xl font-bold tracking-tight after:absolute after:bottom-0 after:left-0 after:h-1 after:w-12 after:rounded-full after:bg-brand sm:text-4xl",
         className,
       )}
     >
