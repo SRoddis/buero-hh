@@ -10,12 +10,8 @@ const MAX_AGE_MS = 30 * 60_000;
 interface SearchPosition {
   href: string;
   windowY: number;
-  /** Desktop: eigene Scrollspalte der Trefferliste */
-  listY: number;
   savedAt: number;
 }
-
-export const SEARCH_LIST_SELECTOR = '[aria-label="Suchergebnisse"]';
 
 const currentHref = () => window.location.pathname + window.location.search;
 
@@ -32,7 +28,6 @@ export function rememberSearchPosition() {
   const entry: SearchPosition = {
     href: currentHref(),
     windowY: window.scrollY,
-    listY: document.querySelector(SEARCH_LIST_SELECTOR)?.scrollTop ?? 0,
     savedAt: Date.now(),
   };
   try {
@@ -54,11 +49,7 @@ export function restoreSearchPosition() {
   } catch {
     // ignorieren
   }
-  const apply = () => {
-    window.scrollTo({ top: entry.windowY });
-    const list = document.querySelector(SEARCH_LIST_SELECTOR);
-    if (list) list.scrollTop = entry.listY;
-  };
+  const apply = () => window.scrollTo({ top: entry.windowY });
   // nach dem Rendern und nochmals kurz danach (Next setzt die Scrollposition bei der Navigation zurück)
   requestAnimationFrame(apply);
   setTimeout(apply, 120);

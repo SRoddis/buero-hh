@@ -43,14 +43,39 @@ export default function CompareMap({ points }: { points: ComparePoint[] }) {
       el.textContent = point.label;
       new Marker({ element: el, anchor: "center" }).setLngLat([point.lng, point.lat]).addTo(map);
     }
-    if (current.length > 1) {
-      const bounds = new LngLatBounds();
-      for (const p of current) bounds.extend([p.lng, p.lat]);
-      map.fitBounds(bounds, { padding: 56, maxZoom: 15, duration: 0 });
-    } else if (current.length === 1) {
-      map.setZoom(14.5);
-    }
-    return () => map.remove();
+    const fit = () => {
+      if (current.length > 1) {
+        const bounds = new LngLatBounds();
+        for (const p of current) bounds.extend([p.lng, p.lat]);
+        // rechts mehr Platz: dort liegen die Zoom-Schaltflächen
+        map.fitBounds(bounds, { padding: { top: 48, bottom: 48, left: 48, right: 64 }, maxZoom: 15, duration: 0 });
+      } else if (current.length === 1) {
+        map.jumpTo({ center: [current[0].lng, current[0].lat], zoom: 14.5 });
+      }
+    };
+    fit();
+
+    // Ändert sich die Größe des Kartenfelds (Layout beim Laden, Fenstergröße), behält MapLibre Mittelpunkt und Zoom –
+    // die Pins rutschen aus der Mitte. Daher neu einpassen, bis der Nutzer selbst verschiebt oder zoomt.
+    let userMoved = false;
+    map.on("movestart", (e) => {
+      if (e.originalEvent) userMoved = true;
+    });
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        map.resize();
+        if (!userMoved) fit();
+      });
+    });
+    observer.observe(containerRef.current);
+
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+      map.remove();
+    };
   }, [key]);
 
   return <div ref={containerRef} className="size-full" />;

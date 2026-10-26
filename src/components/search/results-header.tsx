@@ -1,6 +1,6 @@
 "use client";
 
-import { List, Map as MapIcon } from "lucide-react";
+import { Columns2, List, Map as MapIcon, type LucideIcon } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SORT_OPTIONS, type SortKey } from "@/lib/constants";
@@ -9,7 +9,14 @@ import { cn } from "@/lib/utils";
 
 import { useSearch } from "./search-context";
 
-export type ResultsView = "liste" | "karte";
+/** Desktop: nur Liste, Liste mit Karte daneben oder nur Karte · Mobil: „geteilt“ zeigt wie „liste“ die Liste */
+export type ResultsView = "liste" | "geteilt" | "karte";
+
+const VIEWS: { value: ResultsView; label: string; icon: LucideIcon }[] = [
+  { value: "liste", label: "Liste", icon: List },
+  { value: "geteilt", label: "Liste/Karte", icon: Columns2 },
+  { value: "karte", label: "Karte", icon: MapIcon },
+];
 
 export function ResultsHeader({
   total,
@@ -39,7 +46,7 @@ export function ResultsHeader({
 
       <div className="flex items-center gap-2">
         {/* In der Kartenansicht spielt die Reihenfolge keine Rolle */}
-        {view === "liste" && (
+        {view !== "karte" && (
           <>
             <span className="hidden text-sm text-muted-foreground sm:inline">Sortieren nach</span>
             <Select value={filters.sort} onValueChange={(sort) => update({ sort: sort as SortKey })}>
@@ -58,12 +65,11 @@ export function ResultsHeader({
         )}
 
         <div className="hidden rounded-lg border bg-white p-0.5 lg:flex" role="group" aria-label="Ansicht">
-          <ViewButton active={view === "liste"} onClick={() => onViewChange("liste")} icon={List}>
-            Liste
-          </ViewButton>
-          <ViewButton active={view === "karte"} onClick={() => onViewChange("karte")} icon={MapIcon}>
-            Karte
-          </ViewButton>
+          {VIEWS.map(({ value, label, icon }) => (
+            <ViewButton key={value} active={view === value} onClick={() => onViewChange(value)} icon={icon}>
+              {label}
+            </ViewButton>
+          ))}
         </div>
       </div>
     </div>
@@ -78,7 +84,7 @@ function ViewButton({
 }: {
   active: boolean;
   onClick: () => void;
-  icon: typeof List;
+  icon: LucideIcon;
   children: React.ReactNode;
 }) {
   return (

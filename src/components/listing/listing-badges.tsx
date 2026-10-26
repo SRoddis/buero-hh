@@ -34,7 +34,7 @@ export function ListingBadges({
       {highlighted.map((feature) => {
         const Icon = FEATURE_ICONS[feature];
         return (
-          <Pill key={feature} className={cn("inline-flex items-center gap-1", FEATURE_BADGE_STYLES[feature])}>
+          <Pill key={feature} className={cn("gap-1", FEATURE_BADGE_STYLES[feature])}>
             <Icon className="size-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
             {FEATURES[feature]}
           </Pill>
@@ -44,9 +44,15 @@ export function ListingBadges({
   );
 }
 
+/** Feste Höhe und zentrierter Inhalt – sonst streckt die Zeile Pills ohne Icon auf die Höhe der Pills mit Icon und der Text klebt oben */
 function Pill({ className, children }: { className?: string; children: React.ReactNode }) {
   return (
-    <span className={cn("rounded-full px-2.5 py-1 text-xs leading-none font-medium shadow-sm", className)}>
+    <span
+      className={cn(
+        "inline-flex h-[22px] items-center rounded-full px-2.5 text-xs leading-none font-medium shadow-sm",
+        className,
+      )}
+    >
       {children}
     </span>
   );

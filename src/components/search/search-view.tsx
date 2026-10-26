@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, List, Map as MapIcon, SearchX } from "lucide-react";
+import { List, Map as MapIcon, SearchX } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { CompareBar } from "@/components/compare/compare-bar";
@@ -17,16 +17,12 @@ import { ResultsHeader, type ResultsView } from "./results-header";
 import { SearchBar } from "./search-bar";
 import { useSearch } from "./search-context";
 
-/** Kartengröße in der geteilten Ansicht (Desktop): 0 = ausgeblendet, 1 = normal, 2 = groß */
-type MapSize = 0 | 1 | 2;
-
-const GRID_COLUMNS: Record<MapSize, string> = {
-  0: "lg:grid-cols-1",
-  1: "lg:grid-cols-[minmax(0,1fr)_minmax(420px,44vw)]",
-  2: "lg:grid-cols-[minmax(360px,1fr)_minmax(0,64vw)]",
+/** Desktop: Liste allein oder mit Karte daneben */
+const GRID_COLUMNS: Record<Exclude<ResultsView, "karte">, string> = {
+  liste: "lg:grid-cols-1",
+  geteilt: "lg:grid-cols-[minmax(0,1fr)_minmax(420px,44vw)]",
 };
 
-/** Mobil/Tablet feste Spalten, ab Desktop so viele Spalten (mind. 290 px breit), wie in die Listenspalte passen */
 /**
  * Spalten nach Breite der Liste (Container Query, Karten ca. 280–290 px + 20 px Abstand; 6 Spalten schon bei
  * Full HD ohne Karte) – nur 1, 2, 3, 4, 6 oder 8,
@@ -42,8 +38,9 @@ const CARD_COLUMNS =
 export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: string }) {
   const { filters, update, reset, isPending } = useSearch();
   const comparing = useCompare().items.length > 0;
-  const [view, setView] = useState<ResultsView>("liste");
-  const [mapSize, setMapSize] = useState<MapSize>(1);
+  const [view, setView] = useState<ResultsView>("geteilt");
+  /** Listenansicht, zu der „Zurück“ aus der mobilen Karte führt */
+  const listView = useRef<Exclude<ResultsView, "karte">>("geteilt");
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   // Bewusst kein automatisches Scrollen zur Listenkarte bei Auswahl auf der Karte: Das würde die
   // Seite und damit die Karte unter dem Mauszeiger verschieben, sodass der nächste Klick daneben geht.
@@ -66,10 +63,11 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
     window.scrollTo({ top: 0 });
   };
 
-  const closeMobileMap = () => {
+  const closeMobileMap = (target: Exclude<ResultsView, "karte"> = listView.current) => {
+    listView.current = target;
     // Über den Verlauf zurück – der popstate-Handler stellt Liste und Scrollposition wieder her
     if (mapEntry.current) window.history.back();
-    else setView("liste");
+    else setView(target);
   };
 
   useEffect(() => {
@@ -77,7 +75,7 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
       const entry = mapEntry.current;
       if (!entry) return;
       mapEntry.current = null;
-      setView("liste");
+      setView(listView.current);
       // erst nach dem Rendern der Liste scrollen, sonst ist die Seite noch zu kurz
       requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top: entry.scrollY })));
     };
@@ -86,53 +84,48 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
   }, []);
 
   const showOnMap = (id: string) => {
-    if (mapSize === 0) setMapSize(1);
     const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
     if (!isDesktop) openMobileMap();
+    else if (view === "liste") setView("geteilt");
     setSelectedId(id);
     // erst nach dem Umschalten, damit die Karte ihre endgültige Größe hat
     requestAnimationFrame(() => setMapFocus((f) => ({ id, seq: (f?.seq ?? 0) + 1 })));
   };
-
-  const listRef = useRef<HTMLElement>(null);
 
   // Rückkehr aus dem Objektvergleich: an die vorherige Stelle der Liste springen
   useEffect(restoreSearchPosition, []);
 
   const changePage = (page: number) => {
     update({ page });
-    // Desktop: Liste scrollt in ihrer eigenen Spalte · Mobil: ganze Seite
-    if (window.matchMedia("(min-width: 1024px)").matches) listRef.current?.scrollTo({ top: 0, behavior: "smooth" });
-    else document.getElementById("ergebnisse")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("ergebnisse")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
-    // Desktop: App-Layout in Bildschirmhöhe (abzüglich Seitenheader h-16), damit die Karte immer
-    // vollständig sichtbar ist und die Liste in ihrer eigenen Spalte scrollt
-    <div className="flex flex-1 flex-col lg:h-[calc(100dvh-4rem)] lg:flex-none">
+    // Desktop: Liste und Liste/Karte scrollen mit der Seite, die Karte bleibt dabei stehen (sticky).
+    // Nur die Kartenansicht füllt genau die Bildschirmhöhe (abzüglich Seitenheader h-16).
+    <div className={cn("flex flex-1 flex-col", view === "karte" && "lg:h-[calc(100dvh-4rem)] lg:flex-none")}>
       <div className="mx-auto w-full max-w-[1600px] shrink-0 px-4 pt-3 sm:px-6 lg:px-8 lg:pt-4">
         <SearchBar total={result.total} />
       </div>
 
       {/* Kopfzeile in beiden Ansichten über die volle Breite – Bedienelemente bleiben immer oben rechts */}
       <div className="shrink-0 px-4 pt-4 sm:px-6 lg:px-8">
-        <ResultsHeader total={result.total} view={view} onViewChange={(v) => (v === "liste" ? closeMobileMap() : setView(v))} />
+        <ResultsHeader total={result.total} view={view} onViewChange={(v) => (v === "karte" ? setView(v) : closeMobileMap(v))} />
       </div>
 
       <div
         id="ergebnisse"
         className={cn(
-          "grid flex-1 scroll-mt-2 gap-x-6 gap-y-4 pt-4 lg:min-h-0 lg:grid-rows-[minmax(0,1fr)]",
-          view === "liste" && GRID_COLUMNS[mapSize],
+          // lg:pb-6: Abstand unter Liste und Karte
+          "grid flex-1 scroll-mt-2 gap-x-6 gap-y-4 pt-4 lg:pb-6",
+          view !== "karte" ? GRID_COLUMNS[view] : "lg:min-h-0 lg:grid-rows-[minmax(0,1fr)]",
         )}
       >
         <section
-          ref={listRef}
           aria-label="Suchergebnisse"
           className={cn(
-            // lg:pt-2: Platz für Anheben und Rahmen der Karte beim Hover – sonst schneidet die Scrollspalte sie oben ab
-            "min-w-0 px-4 pb-24 sm:px-6 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:pt-2 lg:pb-6 lg:pl-8",
-            mapSize === 0 ? "lg:pr-8" : "lg:pr-2",
+            "min-w-0 px-4 pb-24 sm:px-6 lg:pb-0 lg:pl-8",
+            view === "liste" ? "lg:pr-8" : "lg:pr-0",
             view === "karte" && "hidden lg:hidden",
             // Platz für die Vergleichsleiste
             comparing && "pb-40 lg:pb-28",
@@ -170,15 +163,19 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
         <div
           className={cn(
             "relative",
-            view === "liste"
-              ? cn("hidden lg:h-full", mapSize > 0 && "lg:block")
-              : "block px-4 pb-24 sm:px-6 lg:min-h-0 lg:px-8 lg:pb-6",
+            view !== "karte"
+              ? cn(
+                  // bleibt beim Scrollen der Liste 16 px unter dem Fensterrand stehen (24 px Abstand unten)
+                  "hidden lg:sticky lg:top-4 lg:h-[calc(100dvh-2.5rem)] lg:self-start lg:pr-8",
+                  view === "geteilt" && "lg:block",
+                )
+              : "block px-4 pb-24 sm:px-6 lg:min-h-0 lg:px-8 lg:pb-0",
           )}
         >
           <div
             className={cn(
-              "relative overflow-hidden",
-              view === "liste" ? "h-full" : "h-[calc(100dvh-4.5rem)] rounded-xl border shadow-sm lg:h-full",
+              "relative overflow-hidden rounded-xl border shadow-sm",
+              view !== "karte" ? "h-full" : "h-[calc(100dvh-4.5rem)] lg:h-full",
             )}
           >
             <ListingsMap
@@ -192,24 +189,9 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
               colorCategory={filters.category}
               focus={mapFocus}
             />
-            {view === "liste" && <MapSizeControls size={mapSize} onChange={setMapSize} />}
           </div>
         </div>
       </div>
-
-      {/* Desktop: ausgeblendete Karte wieder einblenden */}
-      {view === "liste" && mapSize === 0 && (
-        <button
-          type="button"
-          onClick={() => setMapSize(1)}
-          className="fixed top-1/2 right-0 z-30 hidden -translate-y-1/2 items-center gap-2 rounded-l-xl border border-r-0 bg-white py-3 pr-4 pl-3 text-sm font-medium shadow-lg transition-colors hover:bg-muted lg:flex"
-          aria-label="Karte einblenden"
-        >
-          <ChevronLeft className="size-4" />
-          <MapIcon className="size-4 text-brand" />
-          Karte
-        </button>
-      )}
 
       {/* mobil nur in der Listenansicht – in der Kartenansicht liegt dort die Objektkarte */}
       <CompareBar className={view === "karte" ? "max-lg:hidden" : undefined} />
@@ -219,16 +201,16 @@ export function SearchView({ result, fitKey }: { result: SearchResult; fitKey: s
         className={cn(
           "pointer-events-none fixed inset-x-0 z-30 flex justify-center transition-[bottom] duration-300 ease-out lg:hidden",
           // über der Vergleichsleiste, die mobil nur in der Listenansicht erscheint
-          comparing && view === "liste" ? "bottom-[92px]" : "bottom-5",
+          comparing && view !== "karte" ? "bottom-[92px]" : "bottom-5",
         )}
       >
         <Button
           size="lg"
           className="pointer-events-auto h-12 gap-2 rounded-full px-6 text-[0.95rem] shadow-xl"
-          onClick={() => (view === "liste" ? openMobileMap() : closeMobileMap())}
+          onClick={() => (view !== "karte" ? openMobileMap() : closeMobileMap())}
         >
-          {view === "liste" ? <MapIcon className="size-[18px]" /> : <List className="size-[18px]" />}
-          {view === "liste" ? "Karte" : "Liste"}
+          {view !== "karte" ? <MapIcon className="size-[18px]" /> : <List className="size-[18px]" />}
+          {view !== "karte" ? "Karte" : "Liste"}
         </Button>
       </div>
     </div>
@@ -262,34 +244,6 @@ function EmptyState({
           Alle Filter zurücksetzen
         </Button>
       </div>
-    </div>
-  );
-}
-
-function MapSizeControls({ size, onChange }: { size: MapSize; onChange: (size: MapSize) => void }) {
-  const button =
-    "flex size-10 items-center justify-center text-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-35";
-  return (
-    <div className="absolute top-16 left-3 flex flex-col divide-y overflow-hidden rounded-full bg-white shadow-md">
-      <button
-        type="button"
-        className={button}
-        disabled={size === 2}
-        onClick={() => onChange((size + 1) as MapSize)}
-        aria-label="Karte vergrößern"
-        title="Karte vergrößern"
-      >
-        <ChevronLeft className="size-5" />
-      </button>
-      <button
-        type="button"
-        className={button}
-        onClick={() => onChange((size - 1) as MapSize)}
-        aria-label={size === 1 ? "Karte ausblenden" : "Karte verkleinern"}
-        title={size === 1 ? "Karte ausblenden" : "Karte verkleinern"}
-      >
-        <ChevronRight className="size-5" />
-      </button>
     </div>
   );
 }
