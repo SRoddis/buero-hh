@@ -18,8 +18,10 @@ export const bhDetailUrl = (nr: string) => `${BH_BASE}/api/objects/${encodeURICo
 export const bhImageUrl = (nr: string, index: number) =>
   `${BH_BASE}/objects/images/${encodeURIComponent(nr)}/${String(index).padStart(2, "0")}_webBig.jpg`;
 export const bhPdfUrl = (nr: string) => `${BH_BASE}/objects/pdf/BHI_${encodeURIComponent(nr)}.pdf`;
-/** Die Website prüft Bilder 01–19 fortlaufend bis zur ersten Lücke */
+/** Bilder sind 01–19 nummeriert, aber nicht immer lückenlos (z. B. fehlt bei 25702 die 01) */
 export const BH_MAX_IMAGES = 19;
+/** Suche endet erst nach so vielen fehlenden Nummern in Folge (spart Anfragen bei Objekten ohne Bilder) */
+export const BH_MAX_IMAGE_GAP = 3;
 
 export type BhRaw = Record<string, string | number | null | undefined>;
 

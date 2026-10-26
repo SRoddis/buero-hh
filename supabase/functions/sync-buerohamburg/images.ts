@@ -3,7 +3,7 @@ import decodeJpeg, { init as initJpeg } from "npm:@jsquash/jpeg@1.6.0/decode.js"
 import resize, { initResize } from "npm:@jsquash/resize@2.1.0";
 import encodeWebp, { init as initWebp } from "npm:@jsquash/webp@1.5.0/encode.js";
 
-import { bhImageUrl, BH_MAX_IMAGES } from "../_shared/buerohamburg.ts";
+import { bhImageUrl, BH_MAX_IMAGE_GAP, BH_MAX_IMAGES } from "../_shared/buerohamburg.ts";
 import { checksumOf, download, head, mapLimit } from "./http.ts";
 
 const BUCKET = "property-images";
@@ -38,11 +38,20 @@ interface ImageRow {
 // ---------------------------------------------------------------------------
 export async function discoverImages(db: SupabaseClient, propertyId: string, ref: string, title: string): Promise<number> {
   const found: { index: number; url: string; checksum: string }[] = [];
-  for (let index = 1; index <= BH_MAX_IMAGES; index++) {
+  // Lücken in der Nummerierung überspringen; erst nach mehreren fehlenden Nummern in Folge aufhören
+  let misses = 0;
+  // Fehlschläge ohne klare 404 (Netzwerkfehler, 5xx, 429) – dann diesmal keine Bilder löschen
+  let uncertain = false;
+  for (let index = 1; index <= BH_MAX_IMAGES && misses < BH_MAX_IMAGE_GAP; index++) {
     const url = bhImageUrl(ref, index);
     const res = await head(url);
-    if (!res?.ok) break;
-    found.push({ index, url, checksum: checksumOf(res.headers) });
+    if (res?.ok) {
+      found.push({ index, url, checksum: checksumOf(res.headers) });
+      misses = 0;
+    } else {
+      if (!res || res.status === 429 || res.status >= 500) uncertain = true;
+      misses++;
+    }
   }
 
   const { data: existing, error } = await db
@@ -87,7 +96,7 @@ export async function discoverImages(db: SupabaseClient, propertyId: string, ref
 
   // Bilder, die es bei buerohamburg.de nicht mehr gibt
   const validIds = new Set(found.map((f) => `${ref}-${String(f.index).padStart(2, "0")}`));
-  const removed = rows.filter((r) => !validIds.has(r.external_id ?? ""));
+  const removed = uncertain ? [] : rows.filter((r) => !validIds.has(r.external_id ?? ""));
   if (removed.length) {
     await removeStorage(db, removed.flatMap((r) => r.storage_paths));
     await db.from("property_images").delete().in("id", removed.map((r) => r.id));

@@ -24,6 +24,7 @@ const SEARCH_QUERY =
   "lage=HH-Nord&lage=HH-Alster&lage=HH-West&lage=HH-City&lage=HH-City-S%C3%BCd&lage=HH-Ost&lage=HH-S%C3%BCd";
 const USER_AGENT = "BueroHamburg-Datenmigration/1.0 (+https://www.buerohamburg.de)";
 const MAX_IMAGES = 19;
+const MAX_IMAGE_GAP = 3;
 const CONCURRENCY = 2;
 const REQUEST_DELAY_MS = 150;
 
@@ -90,14 +91,22 @@ async function getJson<T>(url: string, attempts = 5): Promise<T> {
   }
 }
 
-/** Bilder sind fortlaufend nummeriert (01, 02, …) – bis zur ersten Lücke prüfen, wie die Website selbst. */
+/**
+ * Bilder sind nummeriert (01, 02, …), aber nicht immer lückenlos – Lücken überspringen und erst nach
+ * MAX_IMAGE_GAP fehlenden Nummern in Folge aufhören (die Website selbst prüft alle 19).
+ */
 async function findImages(nr: string): Promise<string[]> {
   const images: string[] = [];
-  for (let i = 1; i <= MAX_IMAGES; i++) {
+  let misses = 0;
+  for (let i = 1; i <= MAX_IMAGES && misses < MAX_IMAGE_GAP; i++) {
     const url = `${BASE}/objects/images/${encodeURIComponent(nr)}/${String(i).padStart(2, "0")}_webBig.jpg`;
     const res = await request(url, { method: "HEAD" });
-    if (!res.ok) break;
-    images.push(url);
+    if (res.ok) {
+      images.push(url);
+      misses = 0;
+    } else {
+      misses++;
+    }
   }
   return images;
 }

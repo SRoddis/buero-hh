@@ -363,7 +363,7 @@ Merkmale (`web_suchKrit…`):
 
 ### Bilder und Exposé
 
-- Bilder sind fortlaufend nummeriert (`01_webBig.jpg`, `02_webBig.jpg`, …). Eine Bildliste gibt es nicht; wie die Website prüfen wir per `HEAD` bis zur ersten Lücke (höchstens 19).
+- Bilder sind nummeriert (`01_webBig.jpg`, `02_webBig.jpg`, …, höchstens 19), aber **nicht immer lückenlos** – bei 25702 fehlt z. B. die `01`. Eine Bildliste gibt es nicht; die Website prüft alle 19 Nummern. Scraper und Sync prüfen per `HEAD` und hören erst nach 3 fehlenden Nummern in Folge auf.
 - Das Exposé gibt es nicht zu jedem Objekt. Ob es existiert, erkennt man am `Content-Type: application/pdf` (Antwort per `HEAD`).
 
 ### Besonderheiten
