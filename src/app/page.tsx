@@ -10,7 +10,7 @@ import { LocationMap } from "@/components/map/location-map-lazy";
 import { buttonVariants } from "@/components/ui/button";
 import { COMPANY, COMPANY_ADDRESS } from "@/lib/company";
 import { getRepository } from "@/lib/data/repository";
-import { formatNumber } from "@/lib/format";
+import { formatRoundedCount } from "@/lib/format";
 import { DEFAULT_FILTERS, filtersToHref } from "@/lib/search/params";
 import { cn } from "@/lib/utils";
 
@@ -21,11 +21,7 @@ export const metadata: Metadata = {
 /** Startseite nach jedem Sync aktuell halten (Top-Objekte und Anzahlen ändern sich höchstens alle 10 Minuten) */
 export const revalidate = 600;
 
-/** Abgerundete Anzahl für Überschriften („1.100+“) – nie mehr versprechen, als im Bestand ist */
-function roundedCount(n: number) {
-  const step = n >= 1000 ? 100 : 10;
-  return n >= step ? `${formatNumber(Math.floor(n / step) * step)}+` : formatNumber(n);
-}
+const roundedCount = formatRoundedCount;
 
 export default async function HomePage() {
   const repository = await getRepository();

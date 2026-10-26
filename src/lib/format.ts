@@ -75,6 +75,12 @@ export function formatNumber(value: number) {
   return number.format(value);
 }
 
+/** Abgerundete Anzahl für Überschriften („1.100+“) – nie mehr versprechen, als im Bestand ist */
+export function formatRoundedCount(n: number) {
+  const step = n >= 1000 ? 100 : 10;
+  return n >= step ? `${number.format(Math.floor(n / step) * step)}+` : number.format(n);
+}
+
 export function formatCount(n: number, singular: string, plural: string) {
   return `${number.format(n)} ${n === 1 ? singular : plural}`;
 }

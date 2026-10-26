@@ -42,17 +42,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FEATURE_KEYS, FEATURES, MAX_COMPARE, marketAreaLabel, PROPERTY_CATEGORIES } from "@/lib/constants";
-import {
-  formatArea,
-  formatAvailability,
-  formatCommission,
-  formatFurtherAreas,
-  formatRent,
-  formatRentLabel,
-} from "@/lib/format";
+import { MAX_COMPARE, type FeatureKey } from "@/lib/constants";
+import { formatArea, formatRentLabel } from "@/lib/format";
 import type { Listing } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { buildCompareRows, differingRows, shortCategories, type CompareRow, type CompareRowKey } from "@/lib/compare-rows";
 import { listingHref } from "@/lib/urls";
 
 import { toCompareItem, useCompare } from "./compare-provider";
@@ -60,118 +54,38 @@ import { searchReturnHref } from "./search-return";
 
 const LETTERS = ["A", "B", "C"];
 
-/** Vergleichs-PDF, das FileMaker für buerohamburg.de erzeugt (Objektnummern, höchstens 50) */
-const comparePdfUrl = (listings: Listing[]) =>
-  `https://www.buerohamburg.de/api/pdf/vergleich?nr=${encodeURIComponent(listings.map((l) => l.referenceNumber).join(","))}`;
-
-type Tone = "good" | "bad" | null;
-
-interface Row {
-  label: string;
-  icon: LucideIcon;
-  /** Text je Objekt (für „Nur Unterschiede“ verglichen); null = keine Angabe */
-  values: (string | null)[];
-  /** optionale Darstellung statt des Texts (z. B. Links) */
-  render?: (listing: Listing, index: number) => React.ReactNode;
-  tones?: Tone[];
+/** Symbol je Vergleichszeile (Merkmale nutzen dieselben Symbole wie die Ausstattungskacheln) */
+function rowIcon(key: CompareRowKey): LucideIcon {
+  if (key.startsWith("merkmal-")) return FEATURE_ICONS[key.slice("merkmal-".length) as FeatureKey];
+  const icons: Record<string, LucideIcon> = {
+    lage: MapPin,
+    adresse: Navigation,
+    marktgebiet: Landmark,
+    objektart: Building2,
+    objektnummer: Hash,
+    mietflaeche: Maximize,
+    flaechen: Layers,
+    "miete-qm": Euro,
+    "miete-monat": Wallet,
+    nebenkosten: Receipt,
+    verfuegbarkeit: CalendarDays,
+    provision: Percent,
+    expose: FileText,
+  };
+  return icons[key];
 }
 
-const shortCategories = (listing: Listing) =>
-  listing.categories.map((c) => PROPERTY_CATEGORIES.find((p) => p.value === c)?.short ?? c).join(", ");
-
-/** Monatsmiete: Pauschale oder Fläche × m²-Preis */
-function monthlyRent(listing: Listing) {
-  if (listing.rentTotalMonthly != null) return { value: listing.rentTotalMonthly, estimated: false };
-  if (listing.rentPerSqm != null && listing.area > 0) return { value: listing.rentPerSqm * listing.area, estimated: true };
-  return null;
-}
-
-/** Günstigster Wert grün, teuerster rot – nur wenn sich die Werte unterscheiden */
-function lowerIsBetter(values: (number | null)[]): Tone[] {
-  const known = values.filter((v): v is number => v != null);
-  if (known.length < 2) return values.map(() => null);
-  const min = Math.min(...known);
-  const max = Math.max(...known);
-  if (min === max) return values.map(() => null);
-  return values.map((v) => (v === min ? "good" : v === max ? "bad" : null));
-}
-
-/** Ja grün, Nein rot – nur wenn nicht alle Objekte gleich sind */
-function yesIsBetter(values: boolean[]): Tone[] {
-  if (values.every((v) => v === values[0])) return values.map(() => null);
-  return values.map((v) => (v ? "good" : "bad"));
-}
-
-function buildRows(listings: Listing[]): Row[] {
-  const rents = listings.map((l) => l.rentPerSqm);
-  const monthly = listings.map(monthlyRent);
-  const serviceCharges = listings.map((l) => l.units.find((u) => u.serviceChargePerSqm != null)?.serviceChargePerSqm ?? null);
-  const availability = listings.map((l) => {
-    if (!l.units.length) return null;
-    const dates = l.units.map((u) => u.availableFrom).filter((d): d is string => d != null).sort();
-    return formatAvailability(dates[0] ?? null);
-  });
-
-  const rows: Row[] = [
-    { label: "Lage", icon: MapPin, values: listings.map((l) => l.districtName) },
-    { label: "Adresse", icon: Navigation, values: listings.map((l) => l.address || null) },
-    { label: "Marktgebiet", icon: Landmark, values: listings.map((l) => marketAreaLabel(l.marketArea)) },
-    { label: "Objektart", icon: Building2, values: listings.map(shortCategories) },
-    { label: "Objektnummer", icon: Hash, values: listings.map((l) => l.referenceNumber) },
-    { label: "Mietfläche", icon: Maximize, values: listings.map((l) => formatArea(l.area)) },
-    { label: "Flächen im Objekt", icon: Layers, values: listings.map((l) => formatFurtherAreas(l)) },
-    {
-      label: "Miete / m²",
-      icon: Euro,
-      values: rents.map((r) => (r == null ? "auf Anfrage" : formatRent(r))),
-      tones: lowerIsBetter(rents),
-    },
-    {
-      label: "Miete / Monat",
-      icon: Wallet,
-      values: monthly.map((m) => (m ? `${m.estimated ? "≈ " : ""}${formatRent(m.value)}` : "auf Anfrage")),
-      tones: lowerIsBetter(monthly.map((m) => m?.value ?? null)),
-    },
-    {
-      label: "Nebenkosten",
-      icon: Receipt,
-      values: listings.map((l, i) =>
-        serviceCharges[i] != null ? `${formatRent(serviceCharges[i]!)} / m²` : (l.priceNote ?? null),
-      ),
-    },
-    { label: "Verfügbarkeit", icon: CalendarDays, values: availability },
-    {
-      label: "Provision",
-      icon: Percent,
-      values: listings.map((l) => formatCommission(l)),
-      tones: yesIsBetter(listings.map((l) => l.commissionFree)),
-    },
-    ...FEATURE_KEYS.filter((f) => f !== "provisionsfrei").map((feature) => {
-      const has = listings.map((l) => l.features.includes(feature));
-      return {
-        // weiche Trennstellen entfernen – in der Tabelle ist genug Platz
-        label: FEATURES[feature].replace(/­/g, ""),
-        icon: FEATURE_ICONS[feature],
-        values: has.map((h) => (h ? "Ja" : "Nein")),
-        render: (_: Listing, i: number) => <YesNo value={has[i]} />,
-        tones: yesIsBetter(has),
-      };
-    }),
-    {
-      label: "Exposé",
-      icon: FileText,
-      values: listings.map((l) => (l.exposeUrl ? "PDF" : null)),
-      render: (l) =>
-        l.exposeUrl ? (
-          <a href={l.exposeUrl} target="_blank" rel="noopener" className="font-medium text-brand underline-offset-4 hover:underline">
-            PDF öffnen
-          </a>
-        ) : null,
-    },
-  ];
-
-  // Zeilen ohne jede Angabe weglassen
-  return rows.filter((row) => row.values.some((v) => v != null));
+/** Zelleninhalt: Haken/Kreuz für Merkmale, Link fürs Exposé, sonst der Text */
+function cellContent(row: CompareRow, listing: Listing, i: number): React.ReactNode {
+  if (row.flags) return <YesNo value={row.flags[i]} />;
+  if (row.key === "expose") {
+    return listing.exposeUrl ? (
+      <a href={listing.exposeUrl} target="_blank" rel="noopener" className="font-medium text-brand underline-offset-4 hover:underline">
+        PDF öffnen
+      </a>
+    ) : null;
+  }
+  return row.values[i];
 }
 
 /** Dauerhaft gültiger Link: FileMaker-Objektnummern statt interner IDs */
@@ -259,8 +173,8 @@ export function CompareView({ listings, missing = 0 }: { listings: Listing[]; mi
     );
   }
 
-  const rows = buildRows(listings);
-  const visibleRows = onlyDifferences ? rows.filter((r) => new Set(r.values).size > 1) : rows;
+  const rows = buildCompareRows(listings);
+  const visibleRows = onlyDifferences ? differingRows(rows) : rows;
   const located = listings
     .map((l, i) => ({ listing: l, letter: LETTERS[i] }))
     .filter(({ listing }) => listing.lat != null && listing.lng != null);
@@ -385,8 +299,13 @@ export function CompareView({ listings, missing = 0 }: { listings: Listing[]; mi
             <span className="sm:hidden">Teilen</span>
             <span className="hidden sm:inline">Vergleich teilen</span>
           </Button>
-          {/* Vergleichs-PDF aus FileMaker über die API von buerohamburg.de (wie auf der bisherigen Website) */}
-          <a href={comparePdfUrl(listings)} target="_blank" rel="noopener" className={cn(buttonVariants({ size: "lg" }), "gap-2")}>
+          {/* Vergleichs-PDF mit genau der angezeigten Tabelle (inkl. „Nur Unterschiede“), erzeugt von unserem Server */}
+          <a
+            href={`/api/vergleich/pdf?nr=${encodeURIComponent(listings.map((l) => l.referenceNumber).join(","))}${onlyDifferences ? "&unterschiede=1" : ""}`}
+            target="_blank"
+            rel="noopener"
+            className={cn(buttonVariants({ size: "lg" }), "gap-2")}
+          >
             <Printer className="size-4" />
             <span className="sm:hidden">Drucken</span>
             <span className="hidden sm:inline">Vergleich drucken</span>
@@ -429,10 +348,13 @@ export function CompareView({ listings, missing = 0 }: { listings: Listing[]; mi
             </thead>
             <tbody>
               {visibleRows.map((row) => (
-                <tr key={row.label} className="border-b last:border-b-0">
+                <tr key={row.key} className="border-b last:border-b-0">
                   <th scope="row" className="px-4 py-2.5 text-left font-normal text-muted-foreground">
                     <span className="flex items-center gap-2.5">
-                      <row.icon className="size-4 shrink-0" />
+                      {(() => {
+                        const Icon = rowIcon(row.key);
+                        return <Icon className="size-4 shrink-0" />;
+                      })()}
                       {row.label}
                     </span>
                   </th>
@@ -445,7 +367,7 @@ export function CompareView({ listings, missing = 0 }: { listings: Listing[]; mi
                         row.tones?.[i] === "bad" && "bg-rose-50 font-semibold text-rose-900",
                       )}
                     >
-                      {(row.render ? row.render(listing, i) : row.values[i]) ?? <span className="text-muted-foreground">–</span>}
+                      {cellContent(row, listing, i) ?? <span className="text-muted-foreground">–</span>}
                     </td>
                   ))}
                 </tr>

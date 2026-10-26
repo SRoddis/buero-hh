@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const supabaseHost = process.env.SUPABASE_URL ? new URL(process.env.SUPABASE_URL).hostname : undefined;
 
 const nextConfig: NextConfig = {
+  // PDF-Erzeugung (Vergleichs-PDF) unverändert aus node_modules laden statt mitzubündeln
+  serverExternalPackages: ["@react-pdf/renderer"],
   images: {
     remotePatterns: [
       // Objektbilder von buerohamburg.de (bis zur Übernahme in Supabase Storage)
