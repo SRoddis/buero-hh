@@ -28,11 +28,12 @@ const GRID_COLUMNS: Record<MapSize, string> = {
 
 /** Mobil/Tablet feste Spalten, ab Desktop so viele Spalten (mind. 290 px breit), wie in die Listenspalte passen */
 /**
- * Spalten nach Breite der Liste (Container Query, Karten mind. 290 px + 20 px Abstand) – nur 1, 2, 3, 4, 6 oder 8,
+ * Spalten nach Breite der Liste (Container Query, Karten ca. 280–290 px + 20 px Abstand; 6 Spalten schon bei
+ * Full HD ohne Karte) – nur 1, 2, 3, 4, 6 oder 8,
  * damit PAGE_SIZE (24) immer volle Reihen ergibt und keine Lücken am Ende bleiben
  */
 const CARD_COLUMNS =
-  "grid-cols-1 @min-[600px]:grid-cols-2 @min-[910px]:grid-cols-3 @min-[1220px]:grid-cols-4 @min-[1840px]:grid-cols-6 @min-[2460px]:grid-cols-8";
+  "grid-cols-1 @min-[600px]:grid-cols-2 @min-[910px]:grid-cols-3 @min-[1220px]:grid-cols-4 @min-[1780px]:grid-cols-6 @min-[2460px]:grid-cols-8";
 
 /**
  * Orchestriert Suchleiste, Trefferliste und Karte.
