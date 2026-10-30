@@ -33,7 +33,11 @@ Die App benötigt Supabase (siehe [Supabase anbinden](#supabase-anbinden)). Fehl
 - **Sortierung** und **Paginierung**, optimistische UI-Updates während der Server neu lädt
 - **Detailseite** mit Bildergalerie + Lightbox (Tastatur), Eckdaten, Mietflächen-Tabelle, Objektdaten, Lagekarte, ähnlichen Objekten und **Kontaktformular** (Server Action, Zod-Validierung, Honeypot)
 - **Merkliste** ohne Login (lokal im Browser)
-- **Responsive:** Desktop als App-Layout in Bildschirmhöhe (Liste scrollt, Karte fix, Größe umschaltbar); mobil Such-Fly-up und Umschalter Liste/Karte
+- **Responsive:** Desktop mit Ansichten Liste · Liste/Karte · Karte (Seite scrollt, Karte bleibt stehen); mobil Such-Fly-up und Umschalter Liste/Karte
+
+Ausführlicher Projektkontext und eine Beschreibung je Feature: [claude/context.md](claude/context.md). Der Kontext wird mit
+jeder Änderung fortgeschrieben; KI-Agenten werden über [CLAUDE.md](CLAUDE.md) bzw. [AGENTS.md](AGENTS.md) darauf
+hingewiesen.
 
 ## Architektur
 
